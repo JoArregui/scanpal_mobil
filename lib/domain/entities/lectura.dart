@@ -13,6 +13,11 @@ class Lectura {
   final bool esDescatalogado;
   final String? descripcion;
   final TipoOperacion tipoOperacion;
+  // Datos GS1-128 de la etiqueta leída (todos opcionales).
+  final DateTime? fechaCaducidad;
+  final double? pesoNeto;
+  final double? pesoBruto;
+  final String? sscc;
 
   Lectura({
     this.id,
@@ -27,6 +32,10 @@ class Lectura {
     this.esDescatalogado = false,
     this.descripcion,
     this.tipoOperacion = TipoOperacion.inventario,
+    this.fechaCaducidad,
+    this.pesoNeto,
+    this.pesoBruto,
+    this.sscc,
   });
 
   // ================== MAP PARA SQLITE ==================
@@ -43,28 +52,49 @@ class Lectura {
       'lote': _limpiarTexto(lote),
       'es_descatalogado': esDescatalogado ? 1 : 0,
       'descripcion': _limpiarTexto(descripcion),
-      'tipo_operacion': tipoOperacion.name, 
+      'tipo_operacion': tipoOperacion.name,
+      'fecha_caducidad': fechaCaducidad?.toIso8601String(),
+      'peso_neto': pesoNeto,
+      'peso_bruto': pesoBruto,
+      'sscc': _limpiarTexto(sscc),
     };
   }
 
-  /// Formatea los datos específicamente para el envío al servidor 
+  /// Formatea los datos específicamente para el envío al servidor.
+  /// La cantidad viaja como INT cuando es entera (contrato histórico) y como
+  /// DOUBLE con decimales cuando viene de un peso GS1 (310n/330n); antes se
+  /// truncaba con toInt() y un peso de 0.035 kg llegaba como 0.
   Map<String, dynamic> toJson() {
     // 1. Extraemos solo los números de la referencia para asegurar un INT
     // Si la referencia es "REF/123", esto tomará "123"
-    final String soloNumeros = (referenciaArticulo.contains('/')) 
+    final String soloNumeros = (referenciaArticulo.contains('/'))
         ? referenciaArticulo.split('/')[0].replaceAll(RegExp(r'[^0-9]'), '')
         : referenciaArticulo.replaceAll(RegExp(r'[^0-9]'), '');
 
     return {
       // El Servidor espera un INT, no un DOUBLE ni STRING
-      'Referencia': int.tryParse(soloNumeros) ?? 0, 
+      'Referencia': int.tryParse(soloNumeros) ?? 0,
       'CodigoBarras': _limpiarTexto(codigoArticulo) ?? "",
-      'Cantidad': cantidad.toInt(), // Normalmente las lecturas de inventario son enteros
+      'Cantidad': _cantidadParaServidor(),
       'Usuario': idUsuario,
-      'Lote': _limpiarTexto(lote) ?? "", 
+      'Lote': _limpiarTexto(lote) ?? "",
       // Formato YYYY-MM-DD para el Servidor
       'FechaEnvio': _formatearFechaServidor(fechaEnvio ?? DateTime.now()),
+      // Trazabilidad GS1-128 (el servidor ignora lo que no use).
+      'FechaCaducidad': fechaCaducidad != null
+          ? _formatearFechaCorta(fechaCaducidad!)
+          : "",
+      'PesoNeto': pesoNeto,
+      'PesoBruto': pesoBruto,
+      'SSCC': _limpiarTexto(sscc) ?? "",
     };
+  }
+
+  /// INT si la cantidad es entera, DOUBLE si trae decimales (pesos).
+  dynamic _cantidadParaServidor() {
+    return cantidad == cantidad.truncateToDouble()
+        ? cantidad.toInt()
+        : cantidad;
   }
 
   // ================== DESDE SQLITE ==================
@@ -89,6 +119,12 @@ class Lectura {
         (e) => e.name == (map['tipo_operacion'] ?? 'inventario'),
         orElse: () => TipoOperacion.inventario,
       ),
+      fechaCaducidad: map['fecha_caducidad'] != null
+          ? DateTime.parse(map['fecha_caducidad'].toString())
+          : null,
+      pesoNeto: (map['peso_neto'] as num?)?.toDouble(),
+      pesoBruto: (map['peso_bruto'] as num?)?.toDouble(),
+      sscc: map['sscc']?.toString(),
     );
   }
 
@@ -105,6 +141,10 @@ class Lectura {
     bool? esDescatalogado,
     String? descripcion,
     TipoOperacion? tipoOperacion,
+    DateTime? fechaCaducidad,
+    double? pesoNeto,
+    double? pesoBruto,
+    String? sscc,
   }) {
     return Lectura(
       id: id ?? this.id,
@@ -119,6 +159,10 @@ class Lectura {
       esDescatalogado: esDescatalogado ?? this.esDescatalogado,
       descripcion: descripcion ?? this.descripcion,
       tipoOperacion: tipoOperacion ?? this.tipoOperacion,
+      fechaCaducidad: fechaCaducidad ?? this.fechaCaducidad,
+      pesoNeto: pesoNeto ?? this.pesoNeto,
+      pesoBruto: pesoBruto ?? this.pesoBruto,
+      sscc: sscc ?? this.sscc,
     );
   }
 
@@ -133,4 +177,8 @@ class Lectura {
   return "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')} "
          "${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}:${fecha.second.toString().padLeft(2, '0')}";
 }
+
+  String _formatearFechaCorta(DateTime fecha) {
+    return "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}";
+  }
 }

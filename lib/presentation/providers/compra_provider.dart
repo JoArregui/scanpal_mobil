@@ -232,6 +232,10 @@ class CompraProvider with ChangeNotifier {
     required String referenciaArticulo,
     String? lote,
     bool? esDescatalogado,
+    DateTime? fechaCaducidad,
+    double? pesoNeto,
+    double? pesoBruto,
+    String? sscc,
   }) async {
     _state = CompraState.registering;
     notifyListeners();
@@ -255,6 +259,10 @@ class CompraProvider with ChangeNotifier {
             esDescatalogado ?? (_articuloEncontrado?.descatalogado ?? false),
         descripcion: _limpiarTexto(descripcion),
         tipoOperacion: _tipo,
+        fechaCaducidad: fechaCaducidad,
+        pesoNeto: pesoNeto,
+        pesoBruto: pesoBruto,
+        sscc: sscc,
       );
 
       await obtenerLecturasPendientes();

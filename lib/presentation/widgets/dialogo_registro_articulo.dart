@@ -11,6 +11,9 @@ class DialogoRegistroArticulo extends StatefulWidget {
 
   final String? loteExtraido;
   final DateTime? fechaExtraida;
+  final double? pesoNetoExtraido;
+  final double? pesoBrutoExtraido;
+  final String? ssccExtraido;
 
   const DialogoRegistroArticulo({
     super.key,
@@ -21,6 +24,9 @@ class DialogoRegistroArticulo extends StatefulWidget {
     required this.descripcionLimpia,
     this.loteExtraido,
     this.fechaExtraida,
+    this.pesoNetoExtraido,
+    this.pesoBrutoExtraido,
+    this.ssccExtraido,
   });
 
   @override
@@ -261,6 +267,10 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                       referenciaArticulo: widget.articulo.referencia,
                       lote: loteIntroducido.isNotEmpty ? loteIntroducido : null,
                       esDescatalogado: esDescatalogado,
+                      fechaCaducidad: widget.fechaExtraida,
+                      pesoNeto: widget.pesoNetoExtraido,
+                      pesoBruto: widget.pesoBrutoExtraido,
+                      sscc: widget.ssccExtraido,
                     );
 
                     if (!mounted) return;

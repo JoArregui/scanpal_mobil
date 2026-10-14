@@ -4,14 +4,18 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/barcode_parser.dart';
+import '../../domain/entities/documento_esperado.dart';
+import '../../domain/entities/tipo_operacion.dart';
 import '../providers/compra_provider.dart';
 import '../providers/configuracion_provider.dart';
+import '../providers/comprobacion_provider.dart';
 
 import '../widgets/camera_view_section.dart';
 import '../widgets/lector_info_bar.dart';
 import '../widgets/lecturas_data_table.dart';
 import '../widgets/dialogos_lector.dart';
 import '../widgets/dialogo_registro_articulo.dart';
+import '../widgets/documento_panel.dart';
 
 class ComprasPage extends StatefulWidget {
   const ComprasPage({super.key});
@@ -65,6 +69,12 @@ class _ComprasPageState extends State<ComprasPage> {
     if (config.lecturaAutomatica) {
       _toggleCamera();
     }
+
+    // Estado inicial de la comprobación si hay documento activo.
+    if (!mounted) return;
+    await context
+        .read<ComprobacionProvider>()
+        .refrescarTipo(TipoOperacion.compra);
   }
 
   @override
@@ -200,7 +210,18 @@ class _ComprasPageState extends State<ComprasPage> {
           descripcionLimpia,
           referenciaArticulo: articulo.referencia,
           lote: barcode.lote,
+          fechaCaducidad: barcode.fechaCaducidad,
+          pesoNeto: double.tryParse(barcode.pesoNeto ?? ''),
+          pesoBruto: double.tryParse(barcode.pesoBruto ?? ''),
+          sscc: barcode.scc,
         );
+
+        // Actualiza el estado de las líneas del documento en vivo.
+        if (mounted) {
+          await context
+              .read<ComprobacionProvider>()
+              .refrescarTipo(TipoOperacion.compra);
+        }
 
         if (!mounted) return;
 
@@ -235,6 +256,9 @@ class _ComprasPageState extends State<ComprasPage> {
             provider: provider,
             loteExtraido: barcode.lote,
             fechaExtraida: barcode.fechaCaducidad,
+            pesoNetoExtraido: double.tryParse(barcode.pesoNeto ?? ''),
+            pesoBrutoExtraido: double.tryParse(barcode.pesoBruto ?? ''),
+            ssccExtraido: barcode.scc,
           ),
         );
 
@@ -248,6 +272,9 @@ class _ComprasPageState extends State<ComprasPage> {
               ),
             );
             _iniciarBloqueoTemporal();
+            await context
+                .read<ComprobacionProvider>()
+                .refrescarTipo(TipoOperacion.compra);
           }
 
           setState(() {
@@ -326,6 +353,9 @@ class _ComprasPageState extends State<ComprasPage> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CompraProvider>();
+    final comp = context.watch<ComprobacionProvider>();
+    final documento = comp.documentoDe(TipoOperacion.compra);
+    final resultado = comp.resultadoDe(TipoOperacion.compra);
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideScreen = screenWidth > 900;
 
@@ -378,6 +408,10 @@ class _ComprasPageState extends State<ComprasPage> {
           
           Widget tablaLecturas = LecturasDataTable(
             provider: provider,
+            // Con documento activo, lo leído fuera de él va en rojo.
+            esInesperada: documento == null
+                ? null
+                : (vm) => !documentoContieneLectura(documento, vm.lectura),
             onRowDoubleTap: (ctx, prov, vm) {
               DialogosLector.mostrarDialogoEdicion(
                 context: ctx,
@@ -390,6 +424,15 @@ class _ComprasPageState extends State<ComprasPage> {
               );
             },
           );
+
+          // Panel con las líneas del documento y su estado en vivo.
+          Widget? panelDocumento;
+          if (documento != null) {
+            panelDocumento = DocumentoPanel(
+              documento: documento,
+              resultado: resultado,
+            );
+          }
 
           // Widget de cámara extraído para manejar los parámetros requeridos por CameraViewSection
           Widget seccionCamara = CameraViewSection(
@@ -425,7 +468,14 @@ class _ComprasPageState extends State<ComprasPage> {
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
-                Expanded(child: tablaLecturas),
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (panelDocumento != null) panelDocumento,
+                      Expanded(child: tablaLecturas),
+                    ],
+                  ),
+                ),
               ],
             );
           } else {
@@ -439,6 +489,7 @@ class _ComprasPageState extends State<ComprasPage> {
                   ultimoCodigo: _ultimoCodigoEscaneado,
                   onManualEntryTap: _mostrarDialogoManual,
                 ),
+                if (panelDocumento != null) panelDocumento,
                 Expanded(child: tablaLecturas),
               ],
             );

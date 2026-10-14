@@ -15,7 +15,11 @@ class RegistrarLecturaUseCase {
     String? lote,
     bool esDescatalogado = false,
     String? descripcion,
-    TipoOperacion tipoOperacion = TipoOperacion.inventario, 
+    TipoOperacion tipoOperacion = TipoOperacion.inventario,
+    DateTime? fechaCaducidad,
+    double? pesoNeto,
+    double? pesoBruto,
+    String? sscc,
   }) async {
     if (cantidad <= 0) {
       throw Exception("La cantidad debe ser mayor que cero.");
@@ -43,7 +47,11 @@ class RegistrarLecturaUseCase {
       sincronizado: false,
       esDescatalogado: esDescatalogado,
       descripcion: finalDescripcion,
-      tipoOperacion: tipoOperacion, 
+      tipoOperacion: tipoOperacion,
+      fechaCaducidad: fechaCaducidad,
+      pesoNeto: pesoNeto,
+      pesoBruto: pesoBruto,
+      sscc: (sscc != null && sscc.isNotEmpty) ? _limpiarTexto(sscc) : null,
     );
 
     return await repository.registrarLectura(lectura);

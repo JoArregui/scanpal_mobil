@@ -45,6 +45,12 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
         ? _limpiar(lectura.descripcion!)
         : null;
     map[DatabaseHelper.colTipoOperacion] = lectura.tipoOperacion.name;
+    map[DatabaseHelper.colFechaCaducidad] =
+        lectura.fechaCaducidad?.toIso8601String();
+    map[DatabaseHelper.colPesoNeto] = lectura.pesoNeto;
+    map[DatabaseHelper.colPesoBruto] = lectura.pesoBruto;
+    map[DatabaseHelper.colSscc] =
+        lectura.sscc != null ? _limpiar(lectura.sscc!) : null;
 
     return map;
   }
@@ -68,6 +74,14 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
         (e) => e.name == (map[DatabaseHelper.colTipoOperacion] ?? 'inventario'),
         orElse: () => TipoOperacion.inventario,
       ),
+      fechaCaducidad: map[DatabaseHelper.colFechaCaducidad] != null
+          ? DateTime.parse(
+              map[DatabaseHelper.colFechaCaducidad].toString(),
+            )
+          : null,
+      pesoNeto: (map[DatabaseHelper.colPesoNeto] as num?)?.toDouble(),
+      pesoBruto: (map[DatabaseHelper.colPesoBruto] as num?)?.toDouble(),
+      sscc: map[DatabaseHelper.colSscc]?.toString(),
     );
   }
 

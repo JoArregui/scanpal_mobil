@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 class DatabaseHelper {
   static const _databaseName = "ScanPalDB.db";
-  static const _databaseVersion = 1;
+  static const _databaseVersion = 3;
 
   // ==================== TABLA LECTURAS ====================
   static const tableNameLecturas = 'lecturas';
@@ -22,6 +22,11 @@ class DatabaseHelper {
   static const colEsDescatalogado = 'es_descatalogado';
   static const colDescripcion = 'descripcion';
   static const colTipoOperacion = 'tipo_operacion';
+  // Trazabilidad GS1-128 (migración v2).
+  static const colFechaCaducidad = 'fecha_caducidad';
+  static const colPesoNeto = 'peso_neto';
+  static const colPesoBruto = 'peso_bruto';
+  static const colSscc = 'sscc';
 
   // ==================== TABLA ARTÍCULOS ====================
   static const tableNameArticulos = 'articulos';
@@ -52,6 +57,17 @@ class DatabaseHelper {
   static const colMetaKey = 'key';
   static const colMetaValue = 'value';
 
+  // ==================== TABLA DOCUMENTOS ====================
+  // Albaranes de compra / facturas de venta contra los que se comprueban
+  // las lecturas. Las líneas viajan en JSON para no versionar su esquema.
+  static const tableNameDocumentos = 'documentos';
+  static const colDocId = 'id';
+  static const colDocTipo = 'tipo';
+  static const colDocNumero = 'numero';
+  static const colDocFecha = 'fecha';
+  static const colDocTercero = 'tercero';
+  static const colDocLineas = 'lineas_json';
+
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
   DatabaseHelper._privateConstructor();
 
@@ -76,6 +92,7 @@ class DatabaseHelper {
       path,
       version: _databaseVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
     );
   }
@@ -105,7 +122,11 @@ class DatabaseHelper {
         $colLote TEXT,
         $colEsDescatalogado INTEGER NOT NULL DEFAULT 0,
         $colDescripcion TEXT,
-        $colTipoOperacion TEXT NOT NULL DEFAULT 'inventario'
+        $colTipoOperacion TEXT NOT NULL DEFAULT 'inventario',
+        $colFechaCaducidad TEXT,
+        $colPesoNeto REAL,
+        $colPesoBruto REAL,
+        $colSscc TEXT
       )
     ''');
 
@@ -138,6 +159,18 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE $tableNameDocumentos (
+        $colDocId INTEGER PRIMARY KEY AUTOINCREMENT,
+        $colDocTipo TEXT NOT NULL,
+        $colDocNumero TEXT NOT NULL,
+        $colDocFecha TEXT,
+        $colDocTercero TEXT,
+        $colDocLineas TEXT NOT NULL DEFAULT '[]',
+        UNIQUE($colDocTipo, $colDocNumero)
+      )
+    ''');
+
     await db.execute(
       'CREATE INDEX idx_articulos_referencia ON $tableNameArticulos ($colArtReferencia)',
     );
@@ -147,6 +180,45 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_lecturas_tipo ON $tableNameLecturas ($colTipoOperacion)',
     );
+  }
+
+  /// Migraciones:
+  /// v1 → v2: trazabilidad GS1-128 en lecturas (columnas en NULL).
+  /// v2 → v3: tabla de documentos esperados (albarán/factura).
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE $tableNameLecturas ADD COLUMN $colFechaCaducidad TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE $tableNameLecturas ADD COLUMN $colPesoNeto REAL',
+      );
+      await db.execute(
+        'ALTER TABLE $tableNameLecturas ADD COLUMN $colPesoBruto REAL',
+      );
+      await db.execute(
+        'ALTER TABLE $tableNameLecturas ADD COLUMN $colSscc TEXT',
+      );
+      if (kDebugMode) {
+        debugPrint('⬆️ [DB_HELPER] Migración a v2: columnas GS1 añadidas.');
+      }
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS $tableNameDocumentos (
+          $colDocId INTEGER PRIMARY KEY AUTOINCREMENT,
+          $colDocTipo TEXT NOT NULL,
+          $colDocNumero TEXT NOT NULL,
+          $colDocFecha TEXT,
+          $colDocTercero TEXT,
+          $colDocLineas TEXT NOT NULL DEFAULT '[]',
+          UNIQUE($colDocTipo, $colDocNumero)
+        )
+      ''');
+      if (kDebugMode) {
+        debugPrint('⬆️ [DB_HELPER] Migración a v3: tabla documentos creada.');
+      }
+    }
   }
 
   void invalidate() {

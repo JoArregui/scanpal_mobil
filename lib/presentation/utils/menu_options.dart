@@ -30,4 +30,14 @@ final List<OpcionMenu> menuOptions = [
   ),
   OpcionMenu(titulo: 'Ventas', icono: Icons.point_of_sale, ruta: '/venta'),
   OpcionMenu(titulo: 'Compras', icono: Icons.shopping_cart, ruta: '/compra'),
+  OpcionMenu(
+    titulo: 'Comprobar Venta',
+    icono: Icons.playlist_add_check,
+    ruta: '/comprobacion_venta',
+  ),
+  OpcionMenu(
+    titulo: 'Comprobar Compra',
+    icono: Icons.fact_check,
+    ruta: '/comprobacion_compra',
+  ),
 ];

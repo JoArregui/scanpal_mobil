@@ -233,6 +233,10 @@ class VentaProvider with ChangeNotifier {
     required String referenciaArticulo,
     String? lote,
     bool? esDescatalogado,
+    DateTime? fechaCaducidad,
+    double? pesoNeto,
+    double? pesoBruto,
+    String? sscc,
   }) async {
     _state = VentaState.registering;
     notifyListeners();
@@ -256,6 +260,10 @@ class VentaProvider with ChangeNotifier {
             esDescatalogado ?? (_articuloEncontrado?.descatalogado ?? false),
         descripcion: _limpiarTexto(descripcion),
         tipoOperacion: _tipo,
+        fechaCaducidad: fechaCaducidad,
+        pesoNeto: pesoNeto,
+        pesoBruto: pesoBruto,
+        sscc: sscc,
       );
 
       await obtenerLecturasPendientes();

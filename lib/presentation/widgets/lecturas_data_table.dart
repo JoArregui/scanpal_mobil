@@ -5,10 +5,15 @@ class LecturasDataTable extends StatelessWidget {
   final dynamic provider;
   final Function(BuildContext, dynamic, LecturaViewModel) onRowDoubleTap;
 
+  /// Marca las filas fuera de documento (Compras/Ventas con comprobación
+  /// activa) con un color distintivo. Null = comportamiento de siempre.
+  final bool Function(LecturaViewModel)? esInesperada;
+
   const LecturasDataTable({
     super.key,
     required this.provider,
     required this.onRowDoubleTap,
+    this.esInesperada,
   });
 
   @override
@@ -55,6 +60,8 @@ class LecturasDataTable extends StatelessWidget {
           rows: registros.reversed.map((vm) {
             final bool esDescatalogado = vm.lectura.esDescatalogado;
             final bool esCantidadBaja = vm.cantidad < cantidadMinimaGlobal && cantidadMinimaGlobal > 0;
+            final bool fueraDeDocumento = esInesperada?.call(vm) ?? false;
+            const Color colorFueraDeDocumento = Colors.red;
             final String? lote = vm.lectura.lote;
 
             // Función interna para envolver cada celda en el detector de doble toque
@@ -77,6 +84,7 @@ class LecturasDataTable extends StatelessWidget {
 
             return DataRow(
               color: WidgetStateProperty.resolveWith<Color?>((states) {
+                if (fueraDeDocumento) return colorFueraDeDocumento.withValues(alpha: 0.12);
                 if (esDescatalogado) return colorAvisoDescatalogado.withValues(alpha: 0.12);
                 if (esCantidadBaja) return colorAvisoCantidad.withValues(alpha: 0.08);
                 return null;
@@ -93,7 +101,9 @@ class LecturasDataTable extends StatelessWidget {
                               fontSize: 10,
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.bold,
-                              color: esDescatalogado ? Colors.orange[900] : Colors.black)),
+                              color: fueraDeDocumento
+                                  ? colorFueraDeDocumento
+                                  : (esDescatalogado ? Colors.orange[900] : Colors.black))),
                       if (lote != null && lote.isNotEmpty)
                         Text('L: $lote',
                             style: TextStyle(
@@ -110,7 +120,12 @@ class LecturasDataTable extends StatelessWidget {
                     width: MediaQuery.of(context).size.width * 0.55,
                     child: Row(
                       children: [
-                        if (esDescatalogado)
+                        if (fueraDeDocumento)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4.0),
+                            child: Icon(Icons.report_problem_outlined, color: colorFueraDeDocumento, size: 14),
+                          )
+                        else if (esDescatalogado)
                           const Padding(
                             padding: EdgeInsets.only(right: 4.0),
                             child: Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 14),
@@ -127,10 +142,12 @@ class LecturasDataTable extends StatelessWidget {
                             maxLines: 2,
                             style: TextStyle(
                               fontSize: 11,
-                              color: esDescatalogado
-                                  ? Colors.orange[900]
-                                  : (esCantidadBaja ? colorAvisoCantidad : Colors.black87),
-                              fontWeight: (esDescatalogado || esCantidadBaja) ? FontWeight.bold : FontWeight.normal,
+                              color: fueraDeDocumento
+                                  ? colorFueraDeDocumento
+                                  : (esDescatalogado
+                                      ? Colors.orange[900]
+                                      : (esCantidadBaja ? colorAvisoCantidad : Colors.black87)),
+                              fontWeight: (fueraDeDocumento || esDescatalogado || esCantidadBaja) ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         ),
@@ -146,9 +163,11 @@ class LecturasDataTable extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: esDescatalogado
-                          ? Colors.orange[900]
-                          : (esCantidadBaja ? colorAvisoCantidad : Colors.blue[800]),
+                      color: fueraDeDocumento
+                          ? colorFueraDeDocumento
+                          : (esDescatalogado
+                              ? Colors.orange[900]
+                              : (esCantidadBaja ? colorAvisoCantidad : Colors.blue[800])),
                     ),
                   ),
                 ),

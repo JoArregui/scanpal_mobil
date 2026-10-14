@@ -7,6 +7,10 @@ class LecturaWSModel {
   final int usuario;
   final String? lote;
   final DateTime fecha;
+  final DateTime? fechaCaducidad;
+  final double? pesoNeto;
+  final double? pesoBruto;
+  final String? sscc;
 
   LecturaWSModel({
     required this.codigoBarras,
@@ -15,6 +19,10 @@ class LecturaWSModel {
     required this.usuario,
     this.lote,
     required this.fecha,
+    this.fechaCaducidad,
+    this.pesoNeto,
+    this.pesoBruto,
+    this.sscc,
   });
 
   factory LecturaWSModel.fromEntity(Lectura lectura) {
@@ -38,9 +46,13 @@ class LecturaWSModel {
       codigoBarras: codLimpio,
       referencia: refInt,
       cantidad: lectura.cantidad,
-      usuario: lectura.idUsuario, 
+      usuario: lectura.idUsuario,
       lote: parteLote,
       fecha: lectura.fechaEnvio ?? DateTime.now(),
+      fechaCaducidad: lectura.fechaCaducidad,
+      pesoNeto: lectura.pesoNeto,
+      pesoBruto: lectura.pesoBruto,
+      sscc: lectura.sscc,
     );
   }
 
@@ -48,10 +60,18 @@ class LecturaWSModel {
     return {
       "Referencia": referencia,
       "CodigoBarras": codigoBarras,
-      "Cantidad": cantidad,
-      "Usuario": usuario, 
+      "Cantidad": cantidad == cantidad.truncateToDouble()
+          ? cantidad.toInt()
+          : cantidad,
+      "Usuario": usuario,
       "Lote": lote ?? "",
       "FechaEnvio": "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}",
+      "FechaCaducidad": fechaCaducidad != null
+          ? "${fechaCaducidad!.year}-${fechaCaducidad!.month.toString().padLeft(2, '0')}-${fechaCaducidad!.day.toString().padLeft(2, '0')}"
+          : "",
+      "PesoNeto": pesoNeto,
+      "PesoBruto": pesoBruto,
+      "SSCC": sscc ?? "",
     };
   }
 }

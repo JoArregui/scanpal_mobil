@@ -33,6 +33,21 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
          "${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}:${fecha.second.toString().padLeft(2, '0')}";
 }
 
+  /// INT si la cantidad es entera (contrato histórico con el servidor),
+  /// DOUBLE si trae decimales (pesos GS1 310n/330n). Antes se truncaba con
+  /// toInt() y un peso de 0.035 kg llegaba como 0.
+  dynamic _cantidadParaServidor(double cantidad) {
+    return cantidad == cantidad.truncateToDouble()
+        ? cantidad.toInt()
+        : cantidad;
+  }
+
+  /// Fecha de caducidad en formato corto (YYYY-MM-DD) o "" si no hay.
+  String _formatearFechaCorta(DateTime? fecha) {
+    if (fecha == null) return "";
+    return "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}";
+  }
+
   Future<String> _buildUrl(String path) async {
     final config = await configRepository.getConfiguracion();
     if (config.urlBase.isEmpty) {
@@ -106,11 +121,16 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
         return {
           "Referencia": int.tryParse(soloNumerosRef) ?? 0,
           "CodigoBarras": _limpiarTexto(lectura.codigoArticulo),
-          "Cantidad": lectura.cantidad.toInt(),
-          "Usuario": lectura.idUsuario, 
+          "Cantidad": _cantidadParaServidor(lectura.cantidad),
+          "Usuario": lectura.idUsuario,
           "Lote": parteLote ?? "",
           "FechaEnvio": _formatearFecha(ahora),
           "Tipo": tipoWS,
+          // Trazabilidad GS1-128 (el servidor ignora lo que no use).
+          "FechaCaducidad": _formatearFechaCorta(lectura.fechaCaducidad),
+          "PesoNeto": lectura.pesoNeto,
+          "PesoBruto": lectura.pesoBruto,
+          "SSCC": lectura.sscc != null ? _limpiarTexto(lectura.sscc!) : "",
         };
       }).toList();
 

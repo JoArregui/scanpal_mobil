@@ -277,6 +277,10 @@ class _LectorPageState extends State<LectorPage> {
           descripcionLimpia,
           referenciaArticulo: articulo.referencia,
           lote: barcode.lote,
+          fechaCaducidad: barcode.fechaCaducidad,
+          pesoNeto: double.tryParse(barcode.pesoNeto ?? ''),
+          pesoBruto: double.tryParse(barcode.pesoBruto ?? ''),
+          sscc: barcode.scc,
         );
 
         if (!mounted) return;
@@ -313,6 +317,9 @@ class _LectorPageState extends State<LectorPage> {
             provider: provider,
             loteExtraido: barcode.lote,
             fechaExtraida: barcode.fechaCaducidad,
+            pesoNetoExtraido: double.tryParse(barcode.pesoNeto ?? ''),
+            pesoBrutoExtraido: double.tryParse(barcode.pesoBruto ?? ''),
+            ssccExtraido: barcode.scc,
           ),
         );
 

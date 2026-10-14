@@ -18,12 +18,15 @@ import 'data/datasources/auth_remote_datasource.dart';
 import 'data/datasources/config_local_datasource.dart';
 import 'data/datasources/lectura_local_datasource.dart';
 import 'data/datasources/lectura_remote_datasource.dart';
+import 'data/datasources/documento_local_datasource.dart';
+import 'data/datasources/documento_remote_datasource.dart';
 
 // === REPOSITORIES ===
 import 'data/repositories/articulo_repository_impl.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/configuracion_repository_impl.dart';
 import 'data/repositories/lectura_repository_impl.dart';
+import 'data/repositories/documento_repository_impl.dart';
 
 // === DOMAIN ===
 import 'domain/usecases/actualizar_articulo_usecase.dart';
@@ -39,6 +42,10 @@ import 'domain/usecases/obtener_lecturas_por_fecha_usecase.dart';
 import 'domain/usecases/registrar_lectura_usecase.dart';
 import 'domain/usecases/save_configuracion_usecase.dart';
 import 'domain/usecases/sincronizar_catalogo_usecase.dart';
+import 'domain/usecases/obtener_documento_usecase.dart';
+import 'domain/usecases/guardar_documento_usecase.dart';
+import 'domain/usecases/comparar_documento_usecase.dart';
+import 'domain/entities/tipo_operacion.dart';
 
 // === PROVIDERS ===
 import 'presentation/providers/actualizar_articulo_provider.dart';
@@ -47,6 +54,7 @@ import 'presentation/providers/lector_provider.dart';
 import 'presentation/providers/login_provider.dart';
 import 'presentation/providers/compra_provider.dart';
 import 'presentation/providers/venta_provider.dart';
+import 'presentation/providers/comprobacion_provider.dart';
 
 // === PAGES ===
 import 'presentation/pages/actualizar_articulo_page.dart';
@@ -58,6 +66,7 @@ import 'presentation/pages/login_page.dart';
 import 'presentation/pages/ventas_page.dart';
 import 'presentation/pages/compras_page.dart';
 import 'presentation/pages/historial_envios_page.dart';
+import 'presentation/pages/comprobacion_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,6 +147,14 @@ class MyApp extends StatelessWidget {
       lecturaRepository,
     );
 
+    final documentoRepository = DocumentoRepositoryImpl(
+      localDataSource: DocumentoLocalDataSourceImpl(dbHelper: dbHelper),
+      remoteDataSource: DocumentoRemoteDataSourceImpl(
+        client: httpClient,
+        configRepository: configRepository,
+      ),
+    );
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
@@ -187,6 +204,21 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
+          create: (_) => ComprobacionProvider(
+            obtenerDocumentoUseCase: ObtenerDocumentoUseCase(
+              documentoRepository,
+            ),
+            guardarDocumentoUseCase: GuardarDocumentoUseCase(
+              documentoRepository,
+            ),
+            compararDocumentoUseCase: CompararDocumentoUseCase(
+              documentoRepository,
+              lecturaRepository,
+            ),
+            documentoRepository: documentoRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
           create: (_) => ActualizarArticuloProvider(
             buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
             actualizarArticuloUseCase: ActualizarArticuloUseCase(articuloRepository),
@@ -226,6 +258,10 @@ class MyApp extends StatelessWidget {
           '/compra': (_) => const ComprasPage(),
           '/enviar_lecturas': (_) => const EnviarLecturasPage(),
           '/historial_envios': (_) => const HistorialEnviosPage(),
+          '/comprobacion_compra': (_) =>
+              const ComprobacionPage(tipo: TipoOperacion.compra),
+          '/comprobacion_venta': (_) =>
+              const ComprobacionPage(tipo: TipoOperacion.venta),
         },
       ),
     );
