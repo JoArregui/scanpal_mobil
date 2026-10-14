@@ -1,0 +1,69 @@
+name: scanpalphone_app
+description: "A new Flutter project."
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.3
+  mobile_scanner: ^7.1.2
+  provider: ^6.1.5+1
+  http: ^1.5.0
+  intl: ^0.20.2
+  sqflite: ^2.4.2
+  path: ^1.9.1
+  path_provider: ^2.1.5
+  audioplayers: ^6.5.1
+  share_plus: ^12.0.1
+  table_calendar: ^3.2.0
+  flutter_localizations:
+    sdk: flutter
+  
+  sqflite_android: ^2.4.2+2
+ 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  build_runner: ^2.10.4
+  # Paquete para generar los iconos de forma automática
+  flutter_launcher_icons: ^0.13.1
+
+# Configuración del icono de la aplicación
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/ScanPal.png"
+  min_sdk_android: 21 # SDK mínimo para Android
+
+# La siguiente sección es específica para los paquetes de Flutter.
+flutter:
+  uses-material-design: true
+
+  # === DECLARACIÓN DE ASSETS ===
+  assets:
+    - assets/sounds/Articulo_descatalogado.mp3
+    - assets/sounds/Articulo_no_local.mp3
+    - assets/sounds/Caducidad.mp3
+    - assets/images/Ecomputer.jpg
+    - assets/icon/Ecomputer.jpg
+  # ========================================
+
+  # To add custom fonts to your application, add a fonts section here.
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
