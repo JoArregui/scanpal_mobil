@@ -80,6 +80,94 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
     }
   }
 
+  /// Pregunta en qué formato compartir el comprobante (TXT o CSV/Excel).
+  Future<void> _elegirFormatoCompartir() async {
+    final formato = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Compartir comprobante'),
+        content: const Text('Elige el formato del archivo a compartir.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('txt'),
+            child: const Text('TXT'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('csv'),
+            child: const Text('CSV (Excel)'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || formato == null) return;
+    if (formato == 'csv') {
+      await _exportarCsv();
+    } else {
+      await _exportarTxt();
+    }
+  }
+
+  /// Limpia un campo para CSV (; como separador): sin saltos ni separadores.
+  String _campoCsv(String? valor) {
+    return (valor ?? '')
+        .replaceAll(';', ' ')
+        .replaceAll('\n', ' ')
+        .replaceAll('\r', '')
+        .trim();
+  }
+
+  Future<void> _exportarCsv() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<LectorProvider>();
+    final registros = provider.historialLecturas;
+
+    if (registros.isEmpty) return;
+
+    // BOM para que Excel abra bien los acentos; ';' como separador (ES).
+    final buffer = StringBuffer('\uFEFF');
+    buffer.writeln('HORA;CODIGO;REFERENCIA;CANTIDAD;USUARIO;LOTE;DESCRIPCION;CADUCIDAD');
+
+    for (final r in registros) {
+      final hora = r.fechaEnvio != null
+          ? DateFormat('HH:mm:ss').format(r.fechaEnvio!)
+          : '';
+      final caducidad = r.fechaCaducidad != null
+          ? DateFormat('dd/MM/yyyy').format(r.fechaCaducidad!)
+          : '';
+      buffer.writeln(
+        '$hora;${_campoCsv(r.codigoArticulo)};${_campoCsv(r.referenciaArticulo)};'
+        '${r.cantidad.toInt()};${r.idUsuario};${_campoCsv(r.lote)};'
+        '${_campoCsv(r.descripcion)};$caducidad',
+      );
+    }
+
+    try {
+      final directory = await getTemporaryDirectory();
+      final fechaStr = DateFormat('yyyyMMdd').format(_fechaSeleccionada);
+      final file = File('${directory.path}/comprobante_envio_$fechaStr.csv');
+      await file.writeAsString(buffer.toString());
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/csv')],
+          text: 'Comprobante de envíos $fechaStr (CSV)',
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Error al exportar CSV: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _exportarTxt() async {
     final messenger = ScaffoldMessenger.of(context);
     final provider = context.read<LectorProvider>();
@@ -188,7 +276,7 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
           IconButton(
             icon: const Icon(Icons.share_outlined),
             tooltip: 'Compartir Comprobante',
-            onPressed: registros.isEmpty ? null : _exportarTxt,
+            onPressed: registros.isEmpty ? null : () => _elegirFormatoCompartir(),
           ),
           IconButton(
             icon: const Icon(Icons.cleaning_services_outlined),
