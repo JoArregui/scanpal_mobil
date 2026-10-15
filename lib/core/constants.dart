@@ -14,4 +14,6 @@ class AppConstants {
   // Rutas de Sonidos (Assets)
   static const String soundWarningDescatalogado = 'sounds/Articulo_descatalogado.mp3';
   static const String soundErrorNoEncontrado = 'sounds/Articulo_no_local.mp3';
+  // FIFO: aviso de caducidad (una sola reproducción por escaneo caducado).
+  static const String soundAvisoCaducidad = 'sounds/Caducidad.mp3';
 }

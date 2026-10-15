@@ -255,6 +255,11 @@ class _LectorPageState extends State<LectorPage> {
     if (provider.state == LectorState.loadedArticulo ||
         provider.state == LectorState.descatalogadoArticulo) {
       final articulo = provider.articuloEncontrado!;
+      // FIFO: aviso sonoro si la fecha del código ya pasó (solo día, sin bloquear).
+      // Sin await: suena en paralelo sin retrasar el registro ni crear gaps de contexto.
+      if (_esCaducada(barcode.fechaCaducidad)) {
+        unawaited(provider.reproducirAvisoCaducidad());
+      }
       final descripcionLimpia = _limpiarDescripcion(
         articulo.descripcion,
         articulo.codigo,
@@ -376,6 +381,14 @@ class _LectorPageState extends State<LectorPage> {
     if (desc.isEmpty) return 'Sin descripción';
     if (desc == cod) return 'Art. $cod';
     return desc.replaceAll(cod, '').trim();
+  }
+
+  /// FIFO: true si la fecha (solo día) es anterior a hoy. Null => false.
+  bool _esCaducada(DateTime? f) {
+    if (f == null) return false;
+    final hoy = DateTime.now();
+    return DateTime(f.year, f.month, f.day)
+        .isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
 
   void _mostrarDialogoManual() {

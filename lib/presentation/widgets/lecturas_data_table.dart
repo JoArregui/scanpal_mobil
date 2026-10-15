@@ -35,6 +35,10 @@ class LecturasDataTable extends StatelessWidget {
     final int cantidadMinimaGlobal = provider.cantidadMinimaGlobal.toInt();
     const Color colorAvisoCantidad = Colors.deepPurple;
     const Color colorAvisoDescatalogado = Colors.orange;
+    // FIFO: orden por caducidad (sin fecha al final). Solo visual.
+    final List<LecturaViewModel> ordenados = [...registros]
+      ..sort(LecturaViewModel.compararFifo);
+    const Color colorCaducada = Colors.red;
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -55,13 +59,16 @@ class LecturasDataTable extends StatelessWidget {
           columns: const [
             DataColumn(label: Text('Art / Lote', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
             DataColumn(label: Text('Descripción', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+            DataColumn(label: Text('Cad.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
             DataColumn(label: Text('Cant.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
           ],
-          rows: registros.reversed.map((vm) {
+          rows: ordenados.map((vm) {
             final bool esDescatalogado = vm.lectura.esDescatalogado;
             final bool esCantidadBaja = vm.cantidad < cantidadMinimaGlobal && cantidadMinimaGlobal > 0;
             final bool fueraDeDocumento = esInesperada?.call(vm) ?? false;
             const Color colorFueraDeDocumento = Colors.red;
+            // FIFO informativo: aviso visual si caducada, sin bloquear.
+            final bool caducada = vm.estaCaducada;
             final String? lote = vm.lectura.lote;
 
             // Función interna para envolver cada celda en el detector de doble toque
@@ -85,6 +92,7 @@ class LecturasDataTable extends StatelessWidget {
             return DataRow(
               color: WidgetStateProperty.resolveWith<Color?>((states) {
                 if (fueraDeDocumento) return colorFueraDeDocumento.withValues(alpha: 0.12);
+                if (caducada) return colorCaducada.withValues(alpha: 0.10);
                 if (esDescatalogado) return colorAvisoDescatalogado.withValues(alpha: 0.12);
                 if (esCantidadBaja) return colorAvisoCantidad.withValues(alpha: 0.08);
                 return null;
@@ -155,7 +163,31 @@ class LecturasDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Celda 3: Cantidad
+                // Celda 3: Caducidad FIFO (informativa)
+                cellWithDoubleTap(
+                  alignment: Alignment.center,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (caducada)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 2.0),
+                          child: Icon(Icons.warning_amber_rounded, color: colorCaducada, size: 13),
+                        ),
+                      Text(
+                        vm.caducidadCorta,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: caducada ? FontWeight.bold : FontWeight.normal,
+                          color: caducada
+                              ? colorCaducada
+                              : (vm.tieneCaducidad ? Colors.black87 : Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Celda 4: Cantidad
                 cellWithDoubleTap(
                   alignment: Alignment.center,
                   Text(

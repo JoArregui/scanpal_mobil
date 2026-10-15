@@ -1214,7 +1214,9 @@ class BarcodeParser {
       tipo: TipoCodigo.gs1,
       codigoArticulo: codigoArticulo,
       lote: lote,
-      fechaCaducidad: caducidad,
+      // FIFO: AI 17 (caducidad) y fallback a AI 15 (consumo preferente)
+      // cuando no hay 17. Sin fecha => null (se ordena al final, sin aviso).
+      fechaCaducidad: caducidad ?? consumo,
       fechaProduccion: produccion,
       fechaEnvasado: envasado,
       fechaConsumoPreferente: consumo,

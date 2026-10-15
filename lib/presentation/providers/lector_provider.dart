@@ -148,6 +148,12 @@ class LectorProvider with ChangeNotifier {
     }
   }
 
+  /// FIFO: aviso sonoro de caducidad (una reproducción). Se llama desde
+  /// LectorPage al detectar fecha caducada en el código escaneado.
+  Future<void> reproducirAvisoCaducidad() async {
+    await _playSound(AppConstants.soundAvisoCaducidad);
+  }
+
   // --- Gestión de Lecturas Pendientes ---
 
   Future<void> obtenerLecturasPendientes() async {
