@@ -87,9 +87,13 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
     
     if (registros.isEmpty) return;
 
+    final usuarios = registros.map((r) => r.idUsuario).toSet().toList()..sort();
+    final usuariosTxt = usuarios.join(', ');
+
     String contenido = 'COMPROBANTE DE SINCRONIZACIÓN - API\n'
         'FECHA DE CONSULTA: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}\n'
         'FECHA DE REGISTROS: ${DateFormat('dd/MM/yyyy').format(_fechaSeleccionada)}\n'
+        'USUARIO(S): $usuariosTxt\n'
         '==========================================\n\n';
 
     for (final r in registros) {
@@ -97,7 +101,7 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
           ? DateFormat('HH:mm:ss').format(r.fechaEnvio!)
           : '--:--';
       contenido += '[$hora] COD: ${r.codigoArticulo}\n'
-          'REF: ${r.referenciaArticulo} | CANT: ${r.cantidad.toInt()}\n'
+          'REF: ${r.referenciaArticulo} | CANT: ${r.cantidad.toInt()} | USU: ${r.idUsuario}\n'
           'LOTE: ${r.lote ?? "-"}\n'
           'DESC: ${r.descripcion ?? "-"}\n'
           '------------------------------------------\n';
@@ -201,7 +205,7 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
       body: Column(
         children: [
           if (_mostrarCalendario) _buildCalendarioInteractivo(),
-          _buildHeaderInfo(registros.length),
+          _buildHeaderInfo(registros),
           Expanded(
             child: registros.isEmpty
                 ? _buildEmptyState()
@@ -274,7 +278,15 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
     );
   }
 
-  Widget _buildHeaderInfo(int total) {
+  Widget _buildHeaderInfo(List<Lectura> registros) {
+    final total = registros.length;
+    final usuarios = registros.map((r) => r.idUsuario).toSet().toList()
+      ..sort();
+    final usuariosTxt = usuarios.isEmpty
+        ? '-'
+        : usuarios.length == 1
+            ? 'Usuario: ${usuarios.first}'
+            : 'Usuarios: ${usuarios.join(', ')}';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -305,6 +317,24 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
             '$total registros confirmados por el servidor',
             style: TextStyle(color: Colors.grey[700], fontSize: 13),
           ),
+          if (registros.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.person_outline, size: 14, color: Colors.green),
+                const SizedBox(width: 4),
+                Text(
+                  usuariosTxt,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -369,6 +399,21 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
                 Text(
                   'Cod: ${item.codigoArticulo} | Ref: ${item.referenciaArticulo}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 12, color: Colors.green),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Usu: ${item.idUsuario}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
                 ),
                 if (item.lote != null && item.lote!.isNotEmpty)
                   Text(
