@@ -18,15 +18,17 @@ import 'data/datasources/auth_remote_datasource.dart';
 import 'data/datasources/config_local_datasource.dart';
 import 'data/datasources/lectura_local_datasource.dart';
 import 'data/datasources/lectura_remote_datasource.dart';
-import 'data/datasources/documento_local_datasource.dart';
-import 'data/datasources/documento_remote_datasource.dart';
+// PRESENTACION: datasources de documentos (solo Ventas/Compras/Comprobar) ocultos.
+// import 'data/datasources/documento_local_datasource.dart';
+// import 'data/datasources/documento_remote_datasource.dart';
 
 // === REPOSITORIES ===
 import 'data/repositories/articulo_repository_impl.dart';
 import 'data/repositories/auth_repository_impl.dart';
 import 'data/repositories/configuracion_repository_impl.dart';
 import 'data/repositories/lectura_repository_impl.dart';
-import 'data/repositories/documento_repository_impl.dart';
+// PRESENTACION: repositorio de documentos oculto.
+// import 'data/repositories/documento_repository_impl.dart';
 
 // === DOMAIN ===
 import 'domain/usecases/actualizar_articulo_usecase.dart';
@@ -42,19 +44,21 @@ import 'domain/usecases/obtener_lecturas_por_fecha_usecase.dart';
 import 'domain/usecases/registrar_lectura_usecase.dart';
 import 'domain/usecases/save_configuracion_usecase.dart';
 import 'domain/usecases/sincronizar_catalogo_usecase.dart';
-import 'domain/usecases/obtener_documento_usecase.dart';
-import 'domain/usecases/guardar_documento_usecase.dart';
-import 'domain/usecases/comparar_documento_usecase.dart';
-import 'domain/entities/tipo_operacion.dart';
+// PRESENTACION: Ventas/Compras/Comprobar ocultos.
+// import 'domain/usecases/obtener_documento_usecase.dart';
+// import 'domain/usecases/guardar_documento_usecase.dart';
+// import 'domain/usecases/comparar_documento_usecase.dart';
+// import 'domain/entities/tipo_operacion.dart';
 
 // === PROVIDERS ===
 import 'presentation/providers/actualizar_articulo_provider.dart';
 import 'presentation/providers/configuracion_provider.dart';
 import 'presentation/providers/lector_provider.dart';
 import 'presentation/providers/login_provider.dart';
-import 'presentation/providers/compra_provider.dart';
-import 'presentation/providers/venta_provider.dart';
-import 'presentation/providers/comprobacion_provider.dart';
+// PRESENTACION: providers de Ventas/Compras/Comprobar ocultos.
+// import 'presentation/providers/compra_provider.dart';
+// import 'presentation/providers/venta_provider.dart';
+// import 'presentation/providers/comprobacion_provider.dart';
 
 // === PAGES ===
 import 'presentation/pages/actualizar_articulo_page.dart';
@@ -63,10 +67,11 @@ import 'presentation/pages/enviar_lecturas_page.dart';
 import 'presentation/pages/home_page.dart';
 import 'presentation/pages/lector_page.dart';
 import 'presentation/pages/login_page.dart';
-import 'presentation/pages/ventas_page.dart';
-import 'presentation/pages/compras_page.dart';
+// PRESENTACION: páginas de Ventas/Compras/Comprobar ocultas.
+// import 'presentation/pages/ventas_page.dart';
+// import 'presentation/pages/compras_page.dart';
 import 'presentation/pages/historial_envios_page.dart';
-import 'presentation/pages/comprobacion_page.dart';
+// import 'presentation/pages/comprobacion_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -147,13 +152,14 @@ class MyApp extends StatelessWidget {
       lecturaRepository,
     );
 
-    final documentoRepository = DocumentoRepositoryImpl(
-      localDataSource: DocumentoLocalDataSourceImpl(dbHelper: dbHelper),
-      remoteDataSource: DocumentoRemoteDataSourceImpl(
-        client: httpClient,
-        configRepository: configRepository,
-      ),
-    );
+    // PRESENTACION: repositorio de documentos (solo Ventas/Compras/Comprobar) oculto.
+    // final documentoRepository = DocumentoRepositoryImpl(
+    //   localDataSource: DocumentoLocalDataSourceImpl(dbHelper: dbHelper),
+    //   remoteDataSource: DocumentoRemoteDataSourceImpl(
+    //     client: httpClient,
+    //     configRepository: configRepository,
+    //   ),
+    // );
 
     return MultiProvider(
       providers: [
@@ -181,43 +187,44 @@ class MyApp extends StatelessWidget {
             obtenerLecturasPorFechaUseCase: obtenerLecturasPorFechaUseCase,
           ),
         ),
-        ChangeNotifierProvider(
-          create: (_) => CompraProvider(
-            buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
-            registrarLecturaUseCase: RegistrarLecturaUseCase(lecturaRepository),
-            enviarLecturasUseCase: EnviarLecturasUseCase(lecturaRepository),
-            obtenerLecturasUseCase: ObtenerLecturasUseCase(lecturaRepository),
-            actualizarLecturaUseCase: ActualizarLecturaUseCase(lecturaRepository),
-            getConfiguracionUseCase: GetConfiguracionUseCase(configRepository),
-            obtenerLecturasPorFechaUseCase: obtenerLecturasPorFechaUseCase,
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => VentaProvider(
-            buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
-            registrarLecturaUseCase: RegistrarLecturaUseCase(lecturaRepository),
-            enviarLecturasUseCase: EnviarLecturasUseCase(lecturaRepository),
-            obtenerLecturasUseCase: ObtenerLecturasUseCase(lecturaRepository),
-            actualizarLecturaUseCase: ActualizarLecturaUseCase(lecturaRepository),
-            getConfiguracionUseCase: GetConfiguracionUseCase(configRepository),
-            obtenerLecturasPorFechaUseCase: obtenerLecturasPorFechaUseCase,
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => ComprobacionProvider(
-            obtenerDocumentoUseCase: ObtenerDocumentoUseCase(
-              documentoRepository,
-            ),
-            guardarDocumentoUseCase: GuardarDocumentoUseCase(
-              documentoRepository,
-            ),
-            compararDocumentoUseCase: CompararDocumentoUseCase(
-              documentoRepository,
-              lecturaRepository,
-            ),
-            documentoRepository: documentoRepository,
-          ),
-        ),
+        // PRESENTACION: providers de Ventas/Compras/Comprobar ocultos.
+        // ChangeNotifierProvider(
+        //   create: (_) => CompraProvider(
+        //     buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
+        //     registrarLecturaUseCase: RegistrarLecturaUseCase(lecturaRepository),
+        //     enviarLecturasUseCase: EnviarLecturasUseCase(lecturaRepository),
+        //     obtenerLecturasUseCase: ObtenerLecturasUseCase(lecturaRepository),
+        //     actualizarLecturaUseCase: ActualizarLecturaUseCase(lecturaRepository),
+        //     getConfiguracionUseCase: GetConfiguracionUseCase(configRepository),
+        //     obtenerLecturasPorFechaUseCase: obtenerLecturasPorFechaUseCase,
+        //   ),
+        // ),
+        // ChangeNotifierProvider(
+        //   create: (_) => VentaProvider(
+        //     buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
+        //     registrarLecturaUseCase: RegistrarLecturaUseCase(lecturaRepository),
+        //     enviarLecturasUseCase: EnviarLecturasUseCase(lecturaRepository),
+        //     obtenerLecturasUseCase: ObtenerLecturasUseCase(lecturaRepository),
+        //     actualizarLecturaUseCase: ActualizarLecturaUseCase(lecturaRepository),
+        //     getConfiguracionUseCase: GetConfiguracionUseCase(configRepository),
+        //     obtenerLecturasPorFechaUseCase: obtenerLecturasPorFechaUseCase,
+        //   ),
+        // ),
+        // ChangeNotifierProvider(
+        //   create: (_) => ComprobacionProvider(
+        //     obtenerDocumentoUseCase: ObtenerDocumentoUseCase(
+        //       documentoRepository,
+        //     ),
+        //     guardarDocumentoUseCase: GuardarDocumentoUseCase(
+        //       documentoRepository,
+        //     ),
+        //     compararDocumentoUseCase: CompararDocumentoUseCase(
+        //       documentoRepository,
+        //       lecturaRepository,
+        //     ),
+        //     documentoRepository: documentoRepository,
+        //   ),
+        // ),
         ChangeNotifierProvider(
           create: (_) => ActualizarArticuloProvider(
             buscarArticuloUseCase: BuscarArticuloUseCase(articuloRepository),
@@ -254,14 +261,15 @@ class MyApp extends StatelessWidget {
           '/configuracion': (_) => const ConfiguracionPage(),
           '/actualizar_articulos': (_) => const ActualizarArticuloPage(),
           '/lector': (_) => const LectorPage(),
-          '/venta': (_) => const VentasPage(),
-          '/compra': (_) => const ComprasPage(),
+          // PRESENTACION: rutas de Ventas/Compras/Comprobar ocultas.
+          // '/venta': (_) => const VentasPage(),
+          // '/compra': (_) => const ComprasPage(),
           '/enviar_lecturas': (_) => const EnviarLecturasPage(),
           '/historial_envios': (_) => const HistorialEnviosPage(),
-          '/comprobacion_compra': (_) =>
-              const ComprobacionPage(tipo: TipoOperacion.compra),
-          '/comprobacion_venta': (_) =>
-              const ComprobacionPage(tipo: TipoOperacion.venta),
+          // '/comprobacion_compra': (_) =>
+          //     const ComprobacionPage(tipo: TipoOperacion.compra),
+          // '/comprobacion_venta': (_) =>
+          //     const ComprobacionPage(tipo: TipoOperacion.venta),
         },
       ),
     );

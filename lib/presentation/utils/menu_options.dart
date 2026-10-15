@@ -28,16 +28,17 @@ final List<OpcionMenu> menuOptions = [
     icono: Icons.history,
     ruta: '/historial_envios',
   ),
-  OpcionMenu(titulo: 'Ventas', icono: Icons.point_of_sale, ruta: '/venta'),
-  OpcionMenu(titulo: 'Compras', icono: Icons.shopping_cart, ruta: '/compra'),
-  OpcionMenu(
-    titulo: 'Comprobar Venta',
-    icono: Icons.playlist_add_check,
-    ruta: '/comprobacion_venta',
-  ),
-  OpcionMenu(
-    titulo: 'Comprobar Compra',
-    icono: Icons.fact_check,
-    ruta: '/comprobacion_compra',
-  ),
+  // PRESENTACION: Ventas/Compras y Comprobar ocultos (sin rastro en menú).
+  // OpcionMenu(titulo: 'Ventas', icono: Icons.point_of_sale, ruta: '/venta'),
+  // OpcionMenu(titulo: 'Compras', icono: Icons.shopping_cart, ruta: '/compra'),
+  // OpcionMenu(
+  //   titulo: 'Comprobar Venta',
+  //   icono: Icons.playlist_add_check,
+  //   ruta: '/comprobacion_venta',
+  // ),
+  // OpcionMenu(
+  //   titulo: 'Comprobar Compra',
+  //   icono: Icons.fact_check,
+  //   ruta: '/comprobacion_compra',
+  // ),
 ];
