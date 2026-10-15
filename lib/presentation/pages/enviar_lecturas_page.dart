@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 
 // Providers
 import '../providers/lector_provider.dart';
-import '../providers/compra_provider.dart';
-import '../providers/venta_provider.dart';
+// PRESENTACION: Ventas/Compras ocultos en Enviar Lecturas.
+// import '../providers/compra_provider.dart';
+// import '../providers/venta_provider.dart';
 import '../providers/configuracion_provider.dart';
 
 // Widgets
@@ -30,8 +31,9 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
 
   void _cargarTodosLosDatos() {
     context.read<LectorProvider>().obtenerLecturasPendientes();
-    context.read<CompraProvider>().obtenerLecturasPendientes();
-    context.read<VentaProvider>().obtenerLecturasPendientes();
+    // PRESENTACION: sin Compras/Ventas.
+    // context.read<CompraProvider>().obtenerLecturasPendientes();
+    // context.read<VentaProvider>().obtenerLecturasPendientes();
     context.read<ConfiguracionProvider>().cargarConfiguracion();
   }
 
@@ -54,31 +56,32 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
 
     if (!mounted) return;
 
-    // 2. Sincronizar Compras
-    final compProv = context.read<CompraProvider>();
-    if (compProv.registrosViewModel.isNotEmpty) {
-      await compProv.enviarComprasAlServidor();
-      if (compProv.state == CompraState.sendSuccess) {
-        totalEnviados += compProv.lecturasEnviadasCount;
-      } else {
-        errores.add("Compras: ${compProv.errorMessage}");
-      }
-    }
-
-    if (!mounted) return;
-
-    // 3. Sincronizar Ventas
-    final ventProv = context.read<VentaProvider>();
-    if (ventProv.registrosViewModel.isNotEmpty) {
-      await ventProv.enviarVentasAlServidor();
-      if (ventProv.state == VentaState.sendSuccess) {
-        totalEnviados += ventProv.lecturasEnviadasCount;
-      } else {
-        errores.add("Ventas: ${ventProv.errorMessage}");
-      }
-    }
-
-    if (!mounted) return;
+    // PRESENTACION: sincronización de Compras/Ventas oculta.
+    // // 2. Sincronizar Compras
+    // final compProv = context.read<CompraProvider>();
+    // if (compProv.registrosViewModel.isNotEmpty) {
+    //   await compProv.enviarComprasAlServidor();
+    //   if (compProv.state == CompraState.sendSuccess) {
+    //     totalEnviados += compProv.lecturasEnviadasCount;
+    //   } else {
+    //     errores.add("Compras: ${compProv.errorMessage}");
+    //   }
+    // }
+    //
+    // if (!mounted) return;
+    //
+    // // 3. Sincronizar Ventas
+    // final ventProv = context.read<VentaProvider>();
+    // if (ventProv.registrosViewModel.isNotEmpty) {
+    //   await ventProv.enviarVentasAlServidor();
+    //   if (ventProv.state == VentaState.sendSuccess) {
+    //     totalEnviados += ventProv.lecturasEnviadasCount;
+    //   } else {
+    //     errores.add("Ventas: ${ventProv.errorMessage}");
+    //   }
+    // }
+    //
+    // if (!mounted) return;
 
     if (errores.isEmpty) {
       _mostrarDialogoExito(totalEnviados, "Total General");
@@ -92,11 +95,13 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
     
     if (tipo == "Inventario") {
       await provider.enviarLecturasAlServidor();
-    } else if (tipo == "Compras") {
-      await provider.enviarComprasAlServidor();
-    } else if (tipo == "Ventas") {
-      await provider.enviarVentasAlServidor();
     }
+    // PRESENTACION: sin Compras/Ventas.
+    // else if (tipo == "Compras") {
+    //   await provider.enviarComprasAlServidor();
+    // } else if (tipo == "Ventas") {
+    //   await provider.enviarVentasAlServidor();
+    // }
 
     if (!mounted) return;
 
@@ -107,13 +112,15 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
     if (tipo == "Inventario") {
       isError = provider.state == LectorState.sendError;
       isSuccess = provider.state == LectorState.sendSuccess;
-    } else if (tipo == "Compras") {
-      isError = provider.state == CompraState.sendError;
-      isSuccess = provider.state == CompraState.sendSuccess;
-    } else if (tipo == "Ventas") {
-      isError = provider.state == VentaState.sendError;
-      isSuccess = provider.state == VentaState.sendSuccess;
     }
+    // PRESENTACION: estados de Compras/Ventas ocultos.
+    // else if (tipo == "Compras") {
+    //   isError = provider.state == CompraState.sendError;
+    //   isSuccess = provider.state == CompraState.sendSuccess;
+    // } else if (tipo == "Ventas") {
+    //   isError = provider.state == VentaState.sendError;
+    //   isSuccess = provider.state == VentaState.sendSuccess;
+    // }
 
     if (isError) {
       _mostrarDialogoError("$tipo: ${provider.errorMessage}");
@@ -194,19 +201,24 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
   @override
   Widget build(BuildContext context) {
     final invProv = context.watch<LectorProvider>();
-    final compProv = context.watch<CompraProvider>();
-    final ventProv = context.watch<VentaProvider>();
+    // PRESENTACION: sin Compras/Ventas.
+    // final compProv = context.watch<CompraProvider>();
+    // final ventProv = context.watch<VentaProvider>();
     
     final configProv = context.watch<ConfiguracionProvider>();
     final int cantidadMinima = configProv.configuracion.cantidadMinima;
 
-    final bool isSyncing = invProv.state == LectorState.sendingLecturas ||
-                           compProv.state == CompraState.sendingLecturas ||
-                           ventProv.state == VentaState.sendingLecturas;
+    final bool isSyncing = invProv.state == LectorState.sendingLecturas;
+    // PRESENTACION: estados de Compras/Ventas ocultos.
+    // final bool isSyncing = invProv.state == LectorState.sendingLecturas ||
+    //                        compProv.state == CompraState.sendingLecturas ||
+    //                        ventProv.state == VentaState.sendingLecturas;
 
-    final int totalPendiente = invProv.registrosViewModel.length + 
-                               compProv.registrosViewModel.length + 
-                               ventProv.registrosViewModel.length;
+    final int totalPendiente = invProv.registrosViewModel.length;
+    // PRESENTACION: total solo Inventario.
+    // final int totalPendiente = invProv.registrosViewModel.length + 
+    //                            compProv.registrosViewModel.length + 
+    //                            ventProv.registrosViewModel.length;
 
     return LoadingOverlay(
       isLoading: isSyncing,
@@ -231,22 +243,23 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
                     cantidadMin: cantidadMinima,
                     onSync: () => _ejecutarSincronizacionIndividual(invProv, "Inventario"),
                   ),
-                  const SizedBox(height: 12),
-                  _buildExpansionTable(
-                    titulo: "Compras (Entradas)",
-                    registros: compProv.registrosViewModel,
-                    color: Colors.green,
-                    cantidadMin: cantidadMinima,
-                    onSync: () => _ejecutarSincronizacionIndividual(compProv, "Compras"),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildExpansionTable(
-                    titulo: "Ventas (Salidas)",
-                    registros: ventProv.registrosViewModel,
-                    color: Colors.orange,
-                    cantidadMin: cantidadMinima,
-                    onSync: () => _ejecutarSincronizacionIndividual(ventProv, "Ventas"),
-                  ),
+                  // PRESENTACION: secciones Compras/Ventas ocultas.
+                  // const SizedBox(height: 12),
+                  // _buildExpansionTable(
+                  //   titulo: "Compras (Entradas)",
+                  //   registros: compProv.registrosViewModel,
+                  //   color: Colors.green,
+                  //   cantidadMin: cantidadMinima,
+                  //   onSync: () => _ejecutarSincronizacionIndividual(compProv, "Compras"),
+                  // ),
+                  // const SizedBox(height: 12),
+                  // _buildExpansionTable(
+                  //   titulo: "Ventas (Salidas)",
+                  //   registros: ventProv.registrosViewModel,
+                  //   color: Colors.orange,
+                  //   cantidadMin: cantidadMinima,
+                  //   onSync: () => _ejecutarSincronizacionIndividual(ventProv, "Ventas"),
+                  // ),
                 ],
               ),
             ),
@@ -286,6 +299,22 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
     );
   }
 
+  // --- Helpers FIFO informativos (sin fecha al final, sin bloqueos) ---
+  bool _estaCaducada(DateTime? f) {
+    if (f == null) return false;
+    final hoy = DateTime.now();
+    return DateTime(f.year, f.month, f.day)
+        .isBefore(DateTime(hoy.year, hoy.month, hoy.day));
+  }
+
+  String _fmtCadCorta(DateTime? f) {
+    if (f == null) return '-';
+    final dd = f.day.toString().padLeft(2, '0');
+    final mm = f.month.toString().padLeft(2, '0');
+    final yy = (f.year % 100).toString().padLeft(2, '0');
+    return '$dd/$mm/$yy';
+  }
+
   Widget _buildTotalHeader(int total) {
     return Container(
       width: double.infinity,
@@ -312,6 +341,15 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
     required int cantidadMin,
     required VoidCallback onSync,
   }) {
+    // FIFO informativo: ordenar por caducidad (sin fecha al final).
+    final List<dynamic> ordenados = [...registros]..sort((a, b) {
+      final DateTime? fa = a.lectura?.fechaCaducidad as DateTime?;
+      final DateTime? fb = b.lectura?.fechaCaducidad as DateTime?;
+      if (fa == null && fb == null) return 0;
+      if (fa == null) return 1;
+      if (fb == null) return -1;
+      return fa.compareTo(fb);
+    });
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -333,15 +371,19 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
                   columns: const [
                     DataColumn(label: Text('Código', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Lote', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(label: Text('Cad.', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Cant.', style: TextStyle(fontWeight: FontWeight.bold))),
                     DataColumn(label: Text('Ref.', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
-                  rows: registros.map((vm) {
+                  rows: ordenados.map((vm) {
                     final bool esDescatalogado = vm.esDescatalogado;
                     final bool esCantidadBaja = vm.cantidad < cantidadMin;
+                    final DateTime? fCad = vm.lectura?.fechaCaducidad as DateTime?;
+                    final bool caducada = _estaCaducada(fCad);
 
                     return DataRow(
                       color: WidgetStateProperty.resolveWith<Color?>((states) {
+                        if (caducada) return Colors.red.withValues(alpha: 0.10);
                         if (esDescatalogado) return Colors.orange.withValues(alpha: 0.1);
                         if (esCantidadBaja) return Colors.red.withValues(alpha: 0.05);
                         return null;
@@ -349,6 +391,14 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
                       cells: [
                         DataCell(Text(vm.codigo, style: const TextStyle(fontSize: 12))),
                         DataCell(Text(vm.lote ?? '-', style: const TextStyle(fontSize: 12))),
+                        DataCell(Text(
+                          _fmtCadCorta(fCad),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: caducada ? FontWeight.bold : FontWeight.normal,
+                            color: caducada ? Colors.red : (fCad != null ? Colors.black87 : Colors.grey),
+                          ),
+                        )),
                         DataCell(Text(vm.cantidad.toInt().toString(), style: const TextStyle(fontWeight: FontWeight.bold))),
                         DataCell(Text(vm.referencia, style: const TextStyle(fontSize: 11))),
                       ],
