@@ -182,7 +182,7 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Auditoría de Envíos'),
+        title: const _TituloMarquee(text: 'Auditoría de Envíos'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -438,6 +438,99 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Título del AppBar con giro automático: si cabe en el hueco que dejan
+/// los iconos se queda quieto; si no, se desplaza solo hasta el final,
+/// pausa y vuelve, en bucle, para poder leerlo entero.
+class _TituloMarquee extends StatefulWidget {
+  final String text;
+
+  const _TituloMarquee({required this.text});
+
+  @override
+  State<_TituloMarquee> createState() => _TituloMarqueeState();
+}
+
+class _TituloMarqueeState extends State<_TituloMarquee> {
+  late final ScrollController _controller;
+  bool _enMarcha = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarSiDesborda());
+  }
+
+  @override
+  void didUpdateWidget(covariant _TituloMarquee oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _enMarcha = false;
+      if (_controller.hasClients) {
+        _controller.jumpTo(0);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarSiDesborda());
+    }
+  }
+
+  Future<void> _iniciarSiDesborda() async {
+    if (!mounted || _enMarcha || !_controller.hasClients) return;
+    if (_controller.position.maxScrollExtent <= 0) return; // cabe entero
+    _enMarcha = true;
+    const pausa = Duration(seconds: 1);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    while (mounted && _enMarcha && _controller.hasClients) {
+      final double max = _controller.position.maxScrollExtent;
+      if (max <= 0) break;
+      try {
+        await _controller.animateTo(
+          max,
+          duration: Duration(
+            milliseconds: (600 + max * 8).toInt().clamp(800, 6000),
+          ),
+          curve: Curves.linear,
+        );
+      } catch (_) {
+        break;
+      }
+      await Future.delayed(pausa);
+      if (!mounted || !_enMarcha || !_controller.hasClients) break;
+      try {
+        await _controller.animateTo(
+          0,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.linear,
+        );
+      } catch (_) {
+        break;
+      }
+      await Future.delayed(pausa);
+    }
+    _enMarcha = false;
+  }
+
+  @override
+  void dispose() {
+    _enMarcha = false;
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _controller,
+      scrollDirection: Axis.horizontal,
+      physics: const ClampingScrollPhysics(),
+      child: Text(
+        widget.text,
+        maxLines: 1,
+        softWrap: false,
       ),
     );
   }
