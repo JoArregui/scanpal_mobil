@@ -38,7 +38,6 @@ class LecturasDataTable extends StatelessWidget {
     // FIFO: orden por caducidad (sin fecha al final). Solo visual.
     final List<LecturaViewModel> ordenados = [...registros]
       ..sort(LecturaViewModel.compararFifo);
-    const Color colorCaducada = Colors.red;
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -67,8 +66,11 @@ class LecturasDataTable extends StatelessWidget {
             final bool esCantidadBaja = vm.cantidad < cantidadMinimaGlobal && cantidadMinimaGlobal > 0;
             final bool fueraDeDocumento = esInesperada?.call(vm) ?? false;
             const Color colorFueraDeDocumento = Colors.red;
-            // FIFO informativo: aviso visual si caducada, sin bloquear.
-            final bool caducada = vm.estaCaducada;
+            // FIFO: aviso graduado por cercanía de caducidad
+            // (rojo pasado/hoy → naranja 1-3 días → ámbar 4-7 días).
+            final NivelAvisoCaducidad nivelCad = vm.nivelAvisoCaducidad;
+            final bool avisaCad = nivelCad != NivelAvisoCaducidad.ok;
+            final Color colorCad = vm.colorAvisoCaducidad;
             final String? lote = vm.lectura.lote;
 
             // Función interna para envolver cada celda en el detector de doble toque
@@ -92,7 +94,7 @@ class LecturasDataTable extends StatelessWidget {
             return DataRow(
               color: WidgetStateProperty.resolveWith<Color?>((states) {
                 if (fueraDeDocumento) return colorFueraDeDocumento.withValues(alpha: 0.12);
-                if (caducada) return colorCaducada.withValues(alpha: 0.10);
+                if (avisaCad) return colorCad.withValues(alpha: vm.fondoAvisoCaducidad);
                 if (esDescatalogado) return colorAvisoDescatalogado.withValues(alpha: 0.12);
                 if (esCantidadBaja) return colorAvisoCantidad.withValues(alpha: 0.08);
                 return null;
@@ -122,10 +124,11 @@ class LecturasDataTable extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Celda 2: Descripción
+                // Celda 2: Descripción (más estrecha para que quepa Cad.;
+                // si el texto desborda, gira solo en marquee para leerlo todo)
                 cellWithDoubleTap(
                   SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.55,
+                    width: MediaQuery.of(context).size.width * 0.40,
                     child: Row(
                       children: [
                         if (fueraDeDocumento)
@@ -142,12 +145,21 @@ class LecturasDataTable extends StatelessWidget {
                           const Padding(
                             padding: EdgeInsets.only(right: 4.0),
                             child: Icon(Icons.info_outline, color: colorAvisoCantidad, size: 14),
+                          )
+                        else if (avisaCad)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4.0),
+                            child: Icon(
+                              nivelCad == NivelAvisoCaducidad.caducada
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.schedule,
+                              color: colorCad,
+                              size: 14,
+                            ),
                           ),
                         Expanded(
-                          child: Text(
-                            vm.descripcionLimpia,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
+                          child: _DescripcionMarquee(
+                            text: vm.descripcionLimpia,
                             style: TextStyle(
                               fontSize: 11,
                               color: fueraDeDocumento
@@ -163,24 +175,30 @@ class LecturasDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Celda 3: Caducidad FIFO (informativa)
+                // Celda 3: Caducidad FIFO con tonalidad según cercanía
                 cellWithDoubleTap(
                   alignment: Alignment.center,
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (caducada)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 2.0),
-                          child: Icon(Icons.warning_amber_rounded, color: colorCaducada, size: 13),
+                      if (avisaCad)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 2.0),
+                          child: Icon(
+                            nivelCad == NivelAvisoCaducidad.caducada
+                                ? Icons.warning_amber_rounded
+                                : Icons.schedule,
+                            color: colorCad,
+                            size: 13,
+                          ),
                         ),
                       Text(
                         vm.caducidadCorta,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: caducada ? FontWeight.bold : FontWeight.normal,
-                          color: caducada
-                              ? colorCaducada
+                          fontWeight: avisaCad ? FontWeight.bold : FontWeight.normal,
+                          color: avisaCad
+                              ? colorCad
                               : (vm.tieneCaducidad ? Colors.black87 : Colors.grey),
                         ),
                       ),
@@ -207,6 +225,101 @@ class LecturasDataTable extends StatelessWidget {
             );
           }).toList(),
         ),
+      ),
+    );
+  }
+}
+
+/// Texto de descripción con marquee automático: si cabe entero se queda
+/// quieto; si desborda, se desplaza solo hasta el final, pausa y vuelve,
+/// en bucle, para poder leerlo todo sin agrandar la casilla.
+class _DescripcionMarquee extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const _DescripcionMarquee({required this.text, required this.style});
+
+  @override
+  State<_DescripcionMarquee> createState() => _DescripcionMarqueeState();
+}
+
+class _DescripcionMarqueeState extends State<_DescripcionMarquee> {
+  late final ScrollController _controller;
+  bool _enMarcha = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarSiDesborda());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DescripcionMarquee oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _enMarcha = false;
+      if (_controller.hasClients) {
+        _controller.jumpTo(0);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => _iniciarSiDesborda());
+    }
+  }
+
+  Future<void> _iniciarSiDesborda() async {
+    if (!mounted || _enMarcha || !_controller.hasClients) return;
+    if (_controller.position.maxScrollExtent <= 0) return; // cabe entero
+    _enMarcha = true;
+    const pausa = Duration(seconds: 1);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    while (mounted && _enMarcha && _controller.hasClients) {
+      final double max = _controller.position.maxScrollExtent;
+      if (max <= 0) break;
+      try {
+        await _controller.animateTo(
+          max,
+          duration: Duration(
+            milliseconds: (600 + max * 8).toInt().clamp(800, 6000),
+          ),
+          curve: Curves.linear,
+        );
+      } catch (_) {
+        break;
+      }
+      await Future.delayed(pausa);
+      if (!mounted || !_enMarcha || !_controller.hasClients) break;
+      try {
+        await _controller.animateTo(
+          0,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.linear,
+        );
+      } catch (_) {
+        break;
+      }
+      await Future.delayed(pausa);
+    }
+    _enMarcha = false;
+  }
+
+  @override
+  void dispose() {
+    _enMarcha = false;
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _controller,
+      scrollDirection: Axis.horizontal,
+      physics: const ClampingScrollPhysics(),
+      child: Text(
+        widget.text,
+        maxLines: 1,
+        softWrap: false,
+        style: widget.style,
       ),
     );
   }

@@ -8,14 +8,20 @@ class ActualizarLecturaUseCase {
 
   Future<void> execute({
     required Lectura lectura,
-    required double nuevaCantidad,
+    double? nuevaCantidad,
+    DateTime? nuevaFechaCaducidad,
+    // true => quitar la fecha (null). Si es false y nuevaFechaCaducidad
+    // es null, la fecha se conserva.
+    bool quitarFechaCaducidad = false,
   }) async {
-    if (nuevaCantidad <= 0) {
+    if (nuevaCantidad != null && nuevaCantidad <= 0) {
       throw Exception("La cantidad a actualizar debe ser mayor que cero.");
     }
 
     final lecturaActualizada = lectura.copyWith(
       cantidad: nuevaCantidad,
+      fechaCaducidad: nuevaFechaCaducidad,
+      quitarFechaCaducidad: quitarFechaCaducidad,
       sincronizado: false,
       fechaEnvio: null,
     );

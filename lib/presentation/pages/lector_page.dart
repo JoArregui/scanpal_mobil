@@ -487,6 +487,11 @@ class _LectorPageState extends State<LectorPage> {
                   lecturaViewModel: itemVM,
                   nuevaCantidad: nuevaCant,
                 ),
+                onEditFecha: (itemVM, nuevaFecha) => prov.editarLectura(
+                  lecturaViewModel: itemVM,
+                  nuevaFechaCaducidad: nuevaFecha,
+                  quitarFechaCaducidad: nuevaFecha == null,
+                ),
               );
             },
           );

@@ -300,11 +300,48 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
   }
 
   // --- Helpers FIFO informativos (sin fecha al final, sin bloqueos) ---
-  bool _estaCaducada(DateTime? f) {
-    if (f == null) return false;
+  // Nivel de aviso por cercanía: 0 ok, 1 semana (4-7d), 2 próxima (1-3d),
+  // 3 hoy, 4 caducada.
+  int _nivelCaducidad(DateTime? f) {
+    if (f == null) return 0;
     final hoy = DateTime.now();
-    return DateTime(f.year, f.month, f.day)
-        .isBefore(DateTime(hoy.year, hoy.month, hoy.day));
+    final d = DateTime(f.year, f.month, f.day)
+        .difference(DateTime(hoy.year, hoy.month, hoy.day))
+        .inDays;
+    if (d < 0) return 4;
+    if (d == 0) return 3;
+    if (d <= 3) return 2;
+    if (d <= 7) return 1;
+    return 0;
+  }
+
+  Color _colorNivelCad(int nivel) {
+    switch (nivel) {
+      case 4:
+        return Colors.red;
+      case 3:
+        return Colors.deepOrange;
+      case 2:
+        return Colors.orange;
+      case 1:
+        return Colors.amber.shade700;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  double _fondoNivelCad(int nivel) {
+    switch (nivel) {
+      case 4:
+      case 3:
+        return 0.12;
+      case 2:
+        return 0.10;
+      case 1:
+        return 0.07;
+      default:
+        return 0.0;
+    }
   }
 
   String _fmtCadCorta(DateTime? f) {
@@ -379,11 +416,15 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
                     final bool esDescatalogado = vm.esDescatalogado;
                     final bool esCantidadBaja = vm.cantidad < cantidadMin;
                     final DateTime? fCad = vm.lectura?.fechaCaducidad as DateTime?;
-                    final bool caducada = _estaCaducada(fCad);
+                    final int nivelCad = _nivelCaducidad(fCad);
+                    final bool avisaCad = nivelCad > 0;
 
                     return DataRow(
                       color: WidgetStateProperty.resolveWith<Color?>((states) {
-                        if (caducada) return Colors.red.withValues(alpha: 0.10);
+                        if (avisaCad) {
+                          return _colorNivelCad(nivelCad)
+                              .withValues(alpha: _fondoNivelCad(nivelCad));
+                        }
                         if (esDescatalogado) return Colors.orange.withValues(alpha: 0.1);
                         if (esCantidadBaja) return Colors.red.withValues(alpha: 0.05);
                         return null;
@@ -395,8 +436,8 @@ class _EnviarLecturasPageState extends State<EnviarLecturasPage> {
                           _fmtCadCorta(fCad),
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: caducada ? FontWeight.bold : FontWeight.normal,
-                            color: caducada ? Colors.red : (fCad != null ? Colors.black87 : Colors.grey),
+                            fontWeight: avisaCad ? FontWeight.bold : FontWeight.normal,
+                            color: avisaCad ? _colorNivelCad(nivelCad) : (fCad != null ? Colors.black87 : Colors.grey),
                           ),
                         )),
                         DataCell(Text(vm.cantidad.toInt().toString(), style: const TextStyle(fontWeight: FontWeight.bold))),

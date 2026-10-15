@@ -419,6 +419,11 @@ class _VentasPageState extends State<VentasPage> {
                   lecturaViewModel: itemViewModel,
                   nuevaCantidad: nuevaCantidad,
                 ),
+                onEditFecha: (itemViewModel, nuevaFecha) => prov.editarLectura(
+                  lecturaViewModel: itemViewModel,
+                  nuevaFechaCaducidad: nuevaFecha,
+                  quitarFechaCaducidad: nuevaFecha == null,
+                ),
               );
             },
           );

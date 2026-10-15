@@ -404,12 +404,16 @@ class LectorProvider with ChangeNotifier {
 
   Future<bool> editarLectura({
     required LecturaViewModel lecturaViewModel,
-    required double nuevaCantidad,
+    double? nuevaCantidad,
+    DateTime? nuevaFechaCaducidad,
+    bool quitarFechaCaducidad = false,
   }) async {
     try {
       await actualizarLecturaUseCase.execute(
         lectura: lecturaViewModel.lectura,
         nuevaCantidad: nuevaCantidad,
+        nuevaFechaCaducidad: nuevaFechaCaducidad,
+        quitarFechaCaducidad: quitarFechaCaducidad,
       );
       await obtenerLecturasPendientes();
       return true;

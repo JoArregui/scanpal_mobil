@@ -421,6 +421,11 @@ class _ComprasPageState extends State<ComprasPage> {
                   lecturaViewModel: itemVM,
                   nuevaCantidad: nuevaCant,
                 ),
+                onEditFecha: (itemVM, nuevaFecha) => prov.editarLectura(
+                  lecturaViewModel: itemVM,
+                  nuevaFechaCaducidad: nuevaFecha,
+                  quitarFechaCaducidad: nuevaFecha == null,
+                ),
               );
             },
           );

@@ -142,6 +142,8 @@ class Lectura {
     String? descripcion,
     TipoOperacion? tipoOperacion,
     DateTime? fechaCaducidad,
+    // FIFO: permite poner la fecha a null (el ?? impediría quitarla).
+    bool quitarFechaCaducidad = false,
     double? pesoNeto,
     double? pesoBruto,
     String? sscc,
@@ -159,7 +161,9 @@ class Lectura {
       esDescatalogado: esDescatalogado ?? this.esDescatalogado,
       descripcion: descripcion ?? this.descripcion,
       tipoOperacion: tipoOperacion ?? this.tipoOperacion,
-      fechaCaducidad: fechaCaducidad ?? this.fechaCaducidad,
+      fechaCaducidad: quitarFechaCaducidad
+          ? null
+          : (fechaCaducidad ?? this.fechaCaducidad),
       pesoNeto: pesoNeto ?? this.pesoNeto,
       pesoBruto: pesoBruto ?? this.pesoBruto,
       sscc: sscc ?? this.sscc,

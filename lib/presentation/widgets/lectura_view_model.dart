@@ -1,4 +1,19 @@
 import '../../domain/entities/lectura.dart';
+import 'package:flutter/material.dart';
+
+/// Nivel de aviso FIFO por cercanía de caducidad.
+enum NivelAvisoCaducidad {
+  /// Sin fecha o a más de 7 días: sin aviso.
+  ok,
+  /// Caduca en 4-7 días.
+  semana,
+  /// Caduca en 1-3 días.
+  proxima,
+  /// Caduca hoy.
+  hoy,
+  /// Ya caducada (ayer o antes).
+  caducada,
+}
 
 class LecturaViewModel {
   final Lectura lectura;
@@ -38,6 +53,52 @@ class LecturaViewModel {
     final f = lectura.fechaCaducidad;
     if (f == null) return false;
     return _soloFecha(f).isBefore(_soloFecha(DateTime.now()));
+  }
+
+  /// Nivel de aviso según días restantes: pasado/hoy/1-3/4-7/>7 o sin fecha.
+  NivelAvisoCaducidad get nivelAvisoCaducidad {
+    final d = diasParaCaducar;
+    if (d == null) return NivelAvisoCaducidad.ok;
+    if (d < 0) return NivelAvisoCaducidad.caducada;
+    if (d == 0) return NivelAvisoCaducidad.hoy;
+    if (d <= 3) return NivelAvisoCaducidad.proxima;
+    if (d <= 7) return NivelAvisoCaducidad.semana;
+    return NivelAvisoCaducidad.ok;
+  }
+
+  /// true si hay algún aviso (caducada, hoy o dentro de 7 días).
+  bool get avisaCaducidad =>
+      nivelAvisoCaducidad != NivelAvisoCaducidad.ok;
+
+  /// Color del aviso según nivel (rojo → naranja → ámbar).
+  Color get colorAvisoCaducidad {
+    switch (nivelAvisoCaducidad) {
+      case NivelAvisoCaducidad.caducada:
+        return Colors.red;
+      case NivelAvisoCaducidad.hoy:
+        return Colors.deepOrange;
+      case NivelAvisoCaducidad.proxima:
+        return Colors.orange;
+      case NivelAvisoCaducidad.semana:
+        return Colors.amber.shade700;
+      case NivelAvisoCaducidad.ok:
+        return Colors.grey;
+    }
+  }
+
+  /// Opacidad del fondo de fila según nivel.
+  double get fondoAvisoCaducidad {
+    switch (nivelAvisoCaducidad) {
+      case NivelAvisoCaducidad.caducada:
+      case NivelAvisoCaducidad.hoy:
+        return 0.12;
+      case NivelAvisoCaducidad.proxima:
+        return 0.10;
+      case NivelAvisoCaducidad.semana:
+        return 0.07;
+      case NivelAvisoCaducidad.ok:
+        return 0.0;
+    }
   }
 
   /// Días restantes (negativo si caducada). Null si no hay fecha.

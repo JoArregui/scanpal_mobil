@@ -158,6 +158,7 @@ class DialogosLector {
 
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../widgets/lectura_view_model.dart';
 import '../../domain/entities/articulo.dart';
 
@@ -195,13 +196,16 @@ class DialogosLector {
     );
   }
 
-  /// Diálogo principal de gestión (Borrar o Editar)
+  /// Diálogo principal de gestión (Borrar, Editar cantidad o Fecha caducidad).
+  /// [onEditFecha] recibe la fecha elegida, o null para quitarla.
   static Future<void> mostrarDialogoEdicion({
     required BuildContext context,
     required LecturaViewModel viewModel,
     required Function(LecturaViewModel) onDelete,
     required Function(LecturaViewModel, double) onEdit,
+    Function(LecturaViewModel, DateTime?)? onEditFecha,
   }) async {
+    final fechaActual = viewModel.lectura.fechaCaducidad;
     final resultado = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -216,6 +220,9 @@ class DialogosLector {
             ),
             Text('Código: ${viewModel.codigo}'),
             Text('Cant. actual: ${viewModel.cantidad.toInt()}'),
+            Text(
+              'Caducidad: ${fechaActual != null ? DateFormat('dd/MM/yyyy').format(fechaActual) : '-'}',
+            ),
           ],
         ),
         actions: [
@@ -227,6 +234,11 @@ class DialogosLector {
             child: const Text('Editar Cantidad'),
             onPressed: () => Navigator.of(ctx).pop('edit'),
           ),
+          if (onEditFecha != null)
+            TextButton(
+              child: const Text('Fecha Caducidad'),
+              onPressed: () => Navigator.of(ctx).pop('fecha'),
+            ),
           TextButton(
             child: const Text('Cerrar'),
             onPressed: () => Navigator.of(ctx).pop(),
@@ -245,6 +257,71 @@ class DialogosLector {
       );
     } else if (resultado == 'delete') {
       onDelete(viewModel);
+    } else if (resultado == 'fecha' && onEditFecha != null) {
+      await _gestionarFechaCaducidad(
+        context: context,
+        viewModel: viewModel,
+        onConfirmFecha: (fecha) => onEditFecha(viewModel, fecha),
+      );
+    }
+  }
+
+  /// Flujo de fecha de caducidad manual: si ya hay fecha ofrece
+  /// Cambiar / Quitar; si no hay, abre el calendario directamente.
+  /// [onConfirmFecha] recibe la fecha elegida, o null para quitarla.
+  static Future<void> _gestionarFechaCaducidad({
+    required BuildContext context,
+    required LecturaViewModel viewModel,
+    required Function(DateTime?) onConfirmFecha,
+  }) async {
+    final fechaActual = viewModel.lectura.fechaCaducidad;
+
+    if (fechaActual != null) {
+      final accion = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Fecha de Caducidad'),
+          content: Text(
+            'Actual: ${DateFormat('dd/MM/yyyy').format(fechaActual)}',
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Quitar', style: TextStyle(color: Colors.red)),
+              onPressed: () => Navigator.of(ctx).pop('quitar'),
+            ),
+            TextButton(
+              child: const Text('Cambiar'),
+              onPressed: () => Navigator.of(ctx).pop('cambiar'),
+            ),
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ],
+        ),
+      );
+
+      if (!context.mounted || accion == null) return;
+      if (accion == 'quitar') {
+        onConfirmFecha(null);
+        return;
+      }
+      if (accion != 'cambiar') return;
+    }
+
+    if (!context.mounted) return;
+    final elegida = await showDatePicker(
+      context: context,
+      initialDate: fechaActual ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      helpText: 'Fecha de caducidad',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+    );
+
+    if (elegida != null) {
+      onConfirmFecha(elegida);
     }
   }
 
