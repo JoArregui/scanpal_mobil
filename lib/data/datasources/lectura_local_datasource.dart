@@ -45,12 +45,13 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
         ? _limpiar(lectura.descripcion!)
         : null;
     map[DatabaseHelper.colTipoOperacion] = lectura.tipoOperacion.name;
-    map[DatabaseHelper.colFechaCaducidad] =
-        lectura.fechaCaducidad?.toIso8601String();
+    map[DatabaseHelper.colFechaCaducidad] = lectura.fechaCaducidad
+        ?.toIso8601String();
     map[DatabaseHelper.colPesoNeto] = lectura.pesoNeto;
     map[DatabaseHelper.colPesoBruto] = lectura.pesoBruto;
-    map[DatabaseHelper.colSscc] =
-        lectura.sscc != null ? _limpiar(lectura.sscc!) : null;
+    map[DatabaseHelper.colSscc] = lectura.sscc != null
+        ? _limpiar(lectura.sscc!)
+        : null;
 
     return map;
   }
@@ -75,9 +76,7 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
         orElse: () => TipoOperacion.inventario,
       ),
       fechaCaducidad: map[DatabaseHelper.colFechaCaducidad] != null
-          ? DateTime.parse(
-              map[DatabaseHelper.colFechaCaducidad].toString(),
-            )
+          ? DateTime.parse(map[DatabaseHelper.colFechaCaducidad].toString())
           : null,
       pesoNeto: (map[DatabaseHelper.colPesoNeto] as num?)?.toDouble(),
       pesoBruto: (map[DatabaseHelper.colPesoBruto] as num?)?.toDouble(),
@@ -154,7 +153,8 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
       where:
           '${DatabaseHelper.colSincronizado} = ? AND ${DatabaseHelper.colTipoOperacion} = ?',
       whereArgs: [0, tipo.name],
-      orderBy: '${DatabaseHelper.colFecha} DESC',
+      orderBy:
+          '${DatabaseHelper.colFecha} DESC, ${DatabaseHelper.colId} DESC',
     );
     return List.generate(maps.length, (i) => _fromMap(maps[i]));
   }
@@ -203,6 +203,12 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
     final String fechaSincronizacion = DateTime.now().toIso8601String();
 
     for (var lectura in lecturas) {
+      final where = lectura.id != null
+          ? '${DatabaseHelper.colId} = ?'
+          : '${DatabaseHelper.colCodigo} = ? AND ${DatabaseHelper.colFecha} = ?';
+      final whereArgs = lectura.id != null
+          ? [lectura.id]
+          : [lectura.codigoArticulo, lectura.fechaRegistro.toIso8601String()];
       batch.update(
         DatabaseHelper.tableNameLecturas,
         {
@@ -210,12 +216,8 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
           DatabaseHelper.colFechaEnvio:
               lectura.fechaEnvio?.toIso8601String() ?? fechaSincronizacion,
         },
-        where:
-            '${DatabaseHelper.colCodigo} = ? AND ${DatabaseHelper.colFecha} = ?',
-        whereArgs: [
-          lectura.codigoArticulo,
-          lectura.fechaRegistro.toIso8601String(),
-        ],
+        where: where,
+        whereArgs: whereArgs,
       );
     }
     await batch.commit(noResult: true);
@@ -234,7 +236,7 @@ class LecturaLocalDataSourceImpl implements LecturaLocalDataSource {
       where: '${DatabaseHelper.colFecha} < ?',
       whereArgs: [fechaLimite],
     );
-    
+
     await Future.delayed(const Duration(milliseconds: 50));
     return count;
   }

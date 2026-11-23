@@ -27,6 +27,7 @@ dependencies:
     sdk: flutter
   
   sqflite_android: ^2.4.2+2
+  package_info_plus: ^9.0.1
  
 
 dev_dependencies:
@@ -39,6 +40,7 @@ dev_dependencies:
   build_runner: ^2.10.4
   # Paquete para generar los iconos de forma automática
   flutter_launcher_icons: ^0.13.1
+  sqflite_common_ffi: ^2.4.0+3
 
 # Configuración del icono de la aplicación
 flutter_launcher_icons:
@@ -56,6 +58,8 @@ flutter:
     - assets/sounds/Articulo_descatalogado.mp3
     - assets/sounds/Articulo_no_local.mp3
     - assets/sounds/Caducidad.mp3
+    - assets/sounds/error_lectura.mp3
+    - assets/sounds/lectura_correcta.mp3
     - assets/images/Ecomputer.jpg
     - assets/icon/Ecomputer.jpg
   # ========================================

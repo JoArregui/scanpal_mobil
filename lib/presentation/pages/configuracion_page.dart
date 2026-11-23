@@ -14,6 +14,7 @@ class ConfiguracionPage extends StatefulWidget {
 class _ConfiguracionPageState extends State<ConfiguracionPage> {
   final _urlController = TextEditingController();
   final _cantidadController = TextEditingController();
+  final _intervaloLecturaController = TextEditingController();
   bool _lecturaAutomatica = false;
   bool _initialized = false;
   bool _urlDesbloqueadaManual = false;
@@ -134,6 +135,8 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
     if (_formKey.currentState!.validate()) {
       final url = _urlController.text.replaceAll(RegExp(r'\u00a0'), ' ').trim();
       final cantidad = int.tryParse(_cantidadController.text) ?? 0;
+      final intervaloLecturaAutomaticaSegundos =
+          int.tryParse(_intervaloLecturaController.text) ?? 3;
 
       final provider = Provider.of<ConfiguracionProvider>(
         context,
@@ -144,6 +147,8 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
         url,
         cantidad,
         lecturaAutomatica: _lecturaAutomatica,
+        intervaloLecturaAutomaticaSegundos:
+            intervaloLecturaAutomaticaSegundos,
       );
 
       if (exito && mounted) {
@@ -188,6 +193,10 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
                           ? ''
                           : provider.configuracion.cantidadMinima.toString();
                   _lecturaAutomatica = provider.configuracion.lecturaAutomatica;
+                  _intervaloLecturaController.text = provider
+                      .configuracion
+                      .intervaloLecturaAutomaticaSegundos
+                      .toString();
                   _initialized = true;
                 });
               }
@@ -353,6 +362,26 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
                         ),
                       ),
 
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _intervaloLecturaController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Retardo entre lecturas automáticas (segundos)',
+                          helperText:
+                              'Tiempo mínimo de espera antes de aceptar la siguiente lectura.',
+                          border: OutlineInputBorder(),
+                          suffixText: 'segundos',
+                        ),
+                        validator: (value) {
+                          final segundos = int.tryParse(value ?? '');
+                          if (segundos == null || segundos < 1 || segundos > 60) {
+                            return 'Introduzca un valor entre 1 y 60 segundos.';
+                          }
+                          return null;
+                        },
+                      ),
+
                       const SizedBox(height: 50),
 
                       SizedBox(
@@ -408,6 +437,7 @@ class _ConfiguracionPageState extends State<ConfiguracionPage> {
     _cantidadController.removeListener(_onCantidadChanged);
     _urlController.dispose();
     _cantidadController.dispose();
+    _intervaloLecturaController.dispose();
     super.dispose();
   }
 }

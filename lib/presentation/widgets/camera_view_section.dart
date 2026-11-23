@@ -52,6 +52,9 @@ class CameraViewSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int nivelActual = _nivelActual();
+    final int estabilidadVisible = conteoEstabilidad
+        .clamp(0, umbralEstabilidad)
+        .toInt();
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.25,
@@ -59,8 +62,10 @@ class CameraViewSection extends StatelessWidget {
       color: Colors.black,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final Size containerSize =
-              Size(constraints.maxWidth, constraints.maxHeight);
+          final Size containerSize = Size(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
           final Rect scanWindow = _calcularScanWindow(containerSize);
 
           return Stack(
@@ -84,8 +89,8 @@ class CameraViewSection extends StatelessWidget {
                     painter: ScannerOverlayPainter(
                       borderColor: cameraActive
                           ? (conteoEstabilidad > 0
-                              ? Colors.greenAccent
-                              : Colors.green)
+                                ? Colors.greenAccent
+                                : Colors.green)
                           : Colors.white,
                       borderWidth: conteoEstabilidad > 0 ? 2.5 : 2.0,
                       borderRadius: 8,
@@ -104,7 +109,9 @@ class CameraViewSection extends StatelessWidget {
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 3),
+                        horizontal: 12,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(15),
@@ -130,15 +137,16 @@ class CameraViewSection extends StatelessWidget {
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 2),
+                        horizontal: 10,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.greenAccent.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        '█' * conteoEstabilidad +
-                            '░' *
-                                (umbralEstabilidad - conteoEstabilidad),
+                        '█' * estabilidadVisible +
+                            '░' * (umbralEstabilidad - estabilidadVisible),
                         style: const TextStyle(
                           color: Colors.black,
                           fontSize: 10,
@@ -167,7 +175,9 @@ class CameraViewSection extends StatelessWidget {
                             duration: const Duration(milliseconds: 150),
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3),
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: activo
                                   ? Colors.greenAccent
@@ -207,8 +217,11 @@ class CameraViewSection extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.videocam_off,
-                              color: Colors.white, size: 30),
+                          Icon(
+                            Icons.videocam_off,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                           SizedBox(height: 8),
                           Text(
                             'ESCANEO PAUSADO',
@@ -237,13 +250,14 @@ class CameraViewSection extends StatelessWidget {
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
-                              color: Colors.green, strokeWidth: 3),
+                            color: Colors.green,
+                            strokeWidth: 3,
+                          ),
                         ),
                         SizedBox(height: 10),
                         Text(
                           'Buscando...',
-                          style:
-                              TextStyle(color: Colors.white, fontSize: 13),
+                          style: TextStyle(color: Colors.white, fontSize: 13),
                         ),
                       ],
                     ),

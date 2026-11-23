@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print, empty_catches
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
@@ -386,27 +387,6 @@ class ArticuloLocalDataSourceImpl implements ArticuloLocalDataSource {
         DatabaseHelper.tableNameArticulos,
         where: '${DatabaseHelper.colArtReferencia} = ?',
         whereArgs: [valorBusqueda],
-        limit: 1,
-      );
-    }
-
-    // Intento 3: [NUEVO] el código de BD contiene el valor escaneado (LIKE %valor%)
-    // Cubre casos como: escáner lee "10548" y en BD el código es "00010548"
-    if (maps.isEmpty) {
-      maps = await db.query(
-        DatabaseHelper.tableNameArticulos,
-        where: '${DatabaseHelper.colArtCodigo} LIKE ?',
-        whereArgs: ['%$valorBusqueda%'],
-        limit: 1,
-      );
-    }
-
-    // Intento 4: [NUEVO] la referencia de BD contiene el valor escaneado (LIKE %valor%)
-    if (maps.isEmpty) {
-      maps = await db.query(
-        DatabaseHelper.tableNameArticulos,
-        where: '${DatabaseHelper.colArtReferencia} LIKE ?',
-        whereArgs: ['%$valorBusqueda%'],
         limit: 1,
       );
     }

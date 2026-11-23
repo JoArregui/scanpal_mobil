@@ -57,7 +57,7 @@ class LecturasDataTable extends StatelessWidget {
             DataColumn(label: Text('Descripción', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
             DataColumn(label: Text('Cant.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
           ],
-          rows: registros.reversed.map((vm) {
+          rows: registros.map((vm) {
             final bool esDescatalogado = vm.lectura.esDescatalogado;
             final bool esCantidadBaja = vm.cantidad < cantidadMinimaGlobal && cantidadMinimaGlobal > 0;
             final bool fueraDeDocumento = esInesperada?.call(vm) ?? false;

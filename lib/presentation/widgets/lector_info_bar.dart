@@ -24,13 +24,14 @@ class LectorInfoBar extends StatelessWidget {
             label: const Text("Entrada Manual"),
             style: TextButton.styleFrom(foregroundColor: Colors.blueGrey),
           ),
-          Text(
-            'Último: $ultimoCodigo',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          if (ultimoCodigo.trim().isNotEmpty)
+            Text(
+              'Último: ${ultimoCodigo.trim()}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
         ],
       ),
     );

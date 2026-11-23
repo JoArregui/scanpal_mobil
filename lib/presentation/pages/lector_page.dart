@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../widgets/lector_info_bar.dart';
 import '../widgets/lecturas_data_table.dart';
 import '../widgets/dialogos_lector.dart';
 import '../widgets/dialogo_registro_articulo.dart';
+import '../utils/lectura_feedback.dart';
 
 class LectorPage extends StatefulWidget {
   const LectorPage({super.key});
@@ -44,7 +46,6 @@ class _LectorPageState extends State<LectorPage> {
 
   Timer? _bloqueoTimer;
   bool _canRead = true;
-  final Duration _tiempoBloqueo = const Duration(seconds: 2);
 
   @override
   void initState() {
@@ -74,7 +75,9 @@ class _LectorPageState extends State<LectorPage> {
     }
 
     if (config.lecturaAutomatica) {
-      if (kDebugMode) print('⚙️ [INIT] Activando cámara por lectura automática');
+      if (kDebugMode) {
+        print('⚙️ [INIT] Activando cámara por lectura automática');
+      }
       _toggleCamera();
     }
   }
@@ -128,7 +131,9 @@ class _LectorPageState extends State<LectorPage> {
 
     setState(() {
       if (codigo == _codigoEnEspera) {
-        _conteoEstabilidad++;
+        if (_conteoEstabilidad < _umbralesEstabilidad) {
+          _conteoEstabilidad++;
+        }
       } else {
         _codigoEnEspera = codigo;
         _conteoEstabilidad = 1;
@@ -142,7 +147,8 @@ class _LectorPageState extends State<LectorPage> {
     }
 
     final config = context.read<ConfiguracionProvider>().configuracion;
-    if (config.lecturaAutomatica && _conteoEstabilidad >= _umbralesEstabilidad) {
+    if (config.lecturaAutomatica &&
+        _conteoEstabilidad >= _umbralesEstabilidad) {
       if (kDebugMode) print('📸 [SCAN] Auto-disparo por estabilidad detectado');
       _procesarEntradaCodigo(codigo);
     }
@@ -152,7 +158,9 @@ class _LectorPageState extends State<LectorPage> {
     if (!_cameraActive || _isProcessing) return;
 
     if (_codigoEnEspera.isNotEmpty) {
-      if (kDebugMode) print('🎯 [SHOT] Disparo manual sobre: "$_codigoEnEspera"');
+      if (kDebugMode) {
+        print('🎯 [SHOT] Disparo manual sobre: "$_codigoEnEspera"');
+      }
       _procesarEntradaCodigo(_codigoEnEspera);
     } else {
       if (kDebugMode) print('🎯 [SHOT] Intento de disparo sin código en visor');
@@ -168,19 +176,26 @@ class _LectorPageState extends State<LectorPage> {
 
   void _iniciarBloqueoTemporal() {
     setState(() => _canRead = false);
+    final segundos = context
+        .read<ConfiguracionProvider>()
+        .configuracion
+        .intervaloLecturaAutomaticaSegundos;
+    final tiempoBloqueo = Duration(seconds: segundos);
 
     if (kDebugMode) {
       print(
-        '🔒 [DEBOUNCE] Lectura bloqueada por ${_tiempoBloqueo.inSeconds} segundos',
+        '🔒 [DEBOUNCE] Lectura bloqueada por ${tiempoBloqueo.inSeconds} segundos',
       );
     }
 
     _bloqueoTimer?.cancel();
-    _bloqueoTimer = Timer(_tiempoBloqueo, () {
+    _bloqueoTimer = Timer(tiempoBloqueo, () {
       if (mounted) {
         setState(() => _canRead = true);
         if (kDebugMode) {
-          print('🔓 [DEBOUNCE] Lectura desbloqueada, listo para siguiente código');
+          print(
+            '🔓 [DEBOUNCE] Lectura desbloqueada, listo para siguiente código',
+          );
         }
       }
     });
@@ -201,9 +216,9 @@ class _LectorPageState extends State<LectorPage> {
 
     setState(() {
       _isProcessing = true;
+      _canRead = false;
       _cameraActive = false;
       _torchOn = false;
-      _ultimoCodigoEscaneado = rawCodigo;
     });
 
     await cameraController.stop();
@@ -217,43 +232,10 @@ class _LectorPageState extends State<LectorPage> {
     await provider.buscarArticulo(barcode.codigoArticulo);
     if (!mounted) return;
 
-    // ── Fallback fuzzy ─────────────────────────────────────────────────────────
-    if (provider.state == LectorState.noEncontradoFuzzy) {
-      final articuloSeleccionado = await DialogosLector.mostrarBuscadorFuzzy(
-        context: context,
-        sugerencias: provider.sugerenciasFuzzy,
-        codigoEscaneado: rawCodigo,
-        onBuscar: (query) => context
-            .read<LectorProvider>()
-            .buscarArticuloUseCase
-            .executeFuzzy(query),
-      );
-
-      if (!mounted) return;
-
-      if (articuloSeleccionado != null) {
-        provider.seleccionarArticuloDeSugerencia(articuloSeleccionado);
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (!mounted) return;
-      } else {
-        // Usuario canceló el buscador fuzzy
-        _resetZoom();
-        setState(() {
-          _isProcessing = false;
-          _codigoEnEspera = '';
-          _conteoEstabilidad = 0;
-        });
-        if (config.lecturaAutomatica) {
-          setState(() => _cameraActive = true);
-          cameraController.start();
-        }
-        return;
-      }
-    }
-
-    // ── Artículo encontrado (normal o tras fuzzy) ──────────────────────────────
+    // ── Artículo encontrado ────────────────────────────────────────────────────
     if (provider.state == LectorState.loadedArticulo ||
         provider.state == LectorState.descatalogadoArticulo) {
+      setState(() => _ultimoCodigoEscaneado = rawCodigo);
       final articulo = provider.articuloEncontrado!;
       final descripcionLimpia = _limpiarDescripcion(
         articulo.descripcion,
@@ -261,17 +243,16 @@ class _LectorPageState extends State<LectorPage> {
       );
       final double cantidadFinal =
           barcode.cantidad ?? config.cantidadMinima.toDouble();
-
       final bool tieneLoteSiLoRequiere =
-          !articulo.gestionLotes ||
-          (articulo.gestionLotes && barcode.lote != null);
+          !(config.gestionLotes && articulo.gestionLotes) ||
+          (barcode.lote?.trim().isNotEmpty ?? false);
 
       if (config.lecturaAutomatica &&
           !articulo.descatalogado &&
           tieneLoteSiLoRequiere &&
           cantidadFinal > 0) {
         // Registro automático
-        await provider.registrarLectura(
+        final registroCorrecto = await provider.registrarLectura(
           articulo.codigo,
           cantidadFinal,
           descripcionLimpia,
@@ -285,17 +266,30 @@ class _LectorPageState extends State<LectorPage> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Registro Automático: ${barcode.lote ?? "Sin lote"}',
+        if (registroCorrecto) {
+          await LecturaFeedback.correcta();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✅ Registro Automático: ${barcode.lote ?? "Sin lote"}',
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(milliseconds: 700),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(milliseconds: 700),
-          ),
-        );
-
-        _iniciarBloqueoTemporal();
+          );
+          _iniciarBloqueoTemporal();
+        } else {
+          await LecturaFeedback.error();
+          if (!mounted) return;
+          _iniciarBloqueoTemporal();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(provider.errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         _resetZoom();
         setState(() {
           _isProcessing = false;
@@ -315,6 +309,8 @@ class _LectorPageState extends State<LectorPage> {
             cantidadConfigurada: cantidadFinal.toInt(),
             descripcionLimpia: descripcionLimpia,
             provider: provider,
+            gestionLotesHabilitada:
+                config.gestionLotes && articulo.gestionLotes,
             loteExtraido: barcode.lote,
             fechaExtraida: barcode.fechaCaducidad,
             pesoNetoExtraido: double.tryParse(barcode.pesoNeto ?? ''),
@@ -325,6 +321,8 @@ class _LectorPageState extends State<LectorPage> {
 
         if (mounted) {
           if (resultado == true) {
+            await LecturaFeedback.correcta();
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ Registro completado'),
@@ -332,6 +330,9 @@ class _LectorPageState extends State<LectorPage> {
                 duration: Duration(milliseconds: 700),
               ),
             );
+            _iniciarBloqueoTemporal();
+          }
+          else {
             _iniciarBloqueoTemporal();
           }
 
@@ -350,6 +351,9 @@ class _LectorPageState extends State<LectorPage> {
     } else {
       // ── Error: artículo no encontrado ────────────────────────────────────────
       if (mounted) {
+        setState(() => _ultimoCodigoEscaneado = '');
+        await LecturaFeedback.error();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(provider.errorMessage),
@@ -358,6 +362,7 @@ class _LectorPageState extends State<LectorPage> {
         );
 
         _resetZoom();
+        _iniciarBloqueoTemporal();
         setState(() {
           _isProcessing = false;
           _codigoEnEspera = '';

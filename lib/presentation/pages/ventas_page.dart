@@ -16,6 +16,7 @@ import '../widgets/lecturas_data_table.dart';
 import '../widgets/dialogos_lector.dart';
 import '../widgets/dialogo_registro_articulo.dart';
 import '../widgets/documento_panel.dart';
+import '../utils/lectura_feedback.dart';
 
 class VentasPage extends StatefulWidget {
   const VentasPage({super.key});
@@ -47,7 +48,6 @@ class _VentasPageState extends State<VentasPage> {
   // ======== DEBOUNCE / ANTIREBOTE ========
   bool _canRead = true;
   Timer? _bloqueoTimer;
-  final Duration _tiempoBloqueo = const Duration(seconds: 3);
 
   @override
   void initState() {
@@ -72,9 +72,9 @@ class _VentasPageState extends State<VentasPage> {
 
     // Estado inicial de la comprobación si hay documento activo.
     if (!mounted) return;
-    await context
-        .read<ComprobacionProvider>()
-        .refrescarTipo(TipoOperacion.venta);
+    await context.read<ComprobacionProvider>().refrescarTipo(
+      TipoOperacion.venta,
+    );
   }
 
   @override
@@ -120,7 +120,9 @@ class _VentasPageState extends State<VentasPage> {
 
     setState(() {
       if (codigo == _codigoEnEspera) {
-        _conteoEstabilidad++;
+        if (_conteoEstabilidad < _umbralesEstabilidad) {
+          _conteoEstabilidad++;
+        }
       } else {
         _codigoEnEspera = codigo;
         _conteoEstabilidad = 1;
@@ -153,7 +155,11 @@ class _VentasPageState extends State<VentasPage> {
   void _iniciarBloqueoTemporal() {
     setState(() => _canRead = false);
     _bloqueoTimer?.cancel();
-    _bloqueoTimer = Timer(_tiempoBloqueo, () {
+    final segundos = context
+        .read<ConfiguracionProvider>()
+        .configuracion
+        .intervaloLecturaAutomaticaSegundos;
+    _bloqueoTimer = Timer(Duration(seconds: segundos), () {
       if (mounted) {
         setState(() => _canRead = true);
       }
@@ -169,9 +175,9 @@ class _VentasPageState extends State<VentasPage> {
 
     setState(() {
       _isProcessing = true;
+      _canRead = false;
       _cameraActive = false;
       _torchOn = false;
-      _ultimoCodigoEscaneado = rawCodigo;
     });
 
     await cameraController.stop();
@@ -187,6 +193,7 @@ class _VentasPageState extends State<VentasPage> {
 
     if (provider.state == VentaState.loadedArticulo ||
         provider.state == VentaState.descatalogadoArticulo) {
+      setState(() => _ultimoCodigoEscaneado = rawCodigo);
       final articulo = provider.articuloEncontrado!;
       final descripcionLimpia = _limpiarDescripcion(
         articulo.descripcion,
@@ -195,16 +202,15 @@ class _VentasPageState extends State<VentasPage> {
 
       final double cantidadFinal =
           barcode.cantidad ?? config.cantidadMinima.toDouble();
-
-      bool tieneLoteSiLoRequiere =
-          !articulo.gestionLotes ||
-          (articulo.gestionLotes && barcode.lote != null);
+      final bool tieneLoteSiLoRequiere =
+          !(config.gestionLotes && articulo.gestionLotes) ||
+          (barcode.lote?.trim().isNotEmpty ?? false);
 
       if (config.lecturaAutomatica &&
           !articulo.descatalogado &&
           tieneLoteSiLoRequiere &&
           cantidadFinal > 0) {
-        await provider.registrarLectura(
+        final registroCorrecto = await provider.registrarLectura(
           articulo.codigo,
           cantidadFinal,
           descripcionLimpia,
@@ -216,26 +222,35 @@ class _VentasPageState extends State<VentasPage> {
           sscc: barcode.scc,
         );
 
-        // Actualiza el estado de las líneas del documento en vivo.
-        if (mounted) {
-          await context
-              .read<ComprobacionProvider>()
-              .refrescarTipo(TipoOperacion.venta);
-        }
-
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Registro Automático: ${barcode.lote ?? "Sin lote"}',
+        if (registroCorrecto) {
+          await LecturaFeedback.correcta();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✅ Registro Automático: ${barcode.lote ?? "Sin lote"}',
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(milliseconds: 700),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(milliseconds: 700),
-          ),
-        );
-
-        _iniciarBloqueoTemporal();
+          );
+          _iniciarBloqueoTemporal();
+          await context.read<ComprobacionProvider>().refrescarTipo(
+            TipoOperacion.venta,
+          );
+        } else {
+          await LecturaFeedback.error();
+          if (!mounted) return;
+          _iniciarBloqueoTemporal();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(provider.errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
 
         setState(() {
           _isProcessing = false;
@@ -254,6 +269,8 @@ class _VentasPageState extends State<VentasPage> {
             cantidadConfigurada: cantidadFinal.toInt(),
             descripcionLimpia: descripcionLimpia,
             provider: provider,
+            gestionLotesHabilitada:
+                config.gestionLotes && articulo.gestionLotes,
             loteExtraido: barcode.lote,
             fechaExtraida: barcode.fechaCaducidad,
             pesoNetoExtraido: double.tryParse(barcode.pesoNeto ?? ''),
@@ -264,6 +281,8 @@ class _VentasPageState extends State<VentasPage> {
 
         if (mounted) {
           if (resultado == true) {
+            await LecturaFeedback.correcta();
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ Registro completado'),
@@ -272,9 +291,12 @@ class _VentasPageState extends State<VentasPage> {
               ),
             );
             _iniciarBloqueoTemporal();
-            await context
-                .read<ComprobacionProvider>()
-                .refrescarTipo(TipoOperacion.venta);
+            await context.read<ComprobacionProvider>().refrescarTipo(
+              TipoOperacion.venta,
+            );
+          }
+          else {
+            _iniciarBloqueoTemporal();
           }
 
           setState(() {
@@ -291,6 +313,9 @@ class _VentasPageState extends State<VentasPage> {
       }
     } else {
       if (mounted) {
+        setState(() => _ultimoCodigoEscaneado = '');
+        await LecturaFeedback.error();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(provider.errorMessage),
@@ -298,6 +323,7 @@ class _VentasPageState extends State<VentasPage> {
           ),
         );
 
+        _iniciarBloqueoTemporal();
         setState(() {
           _isProcessing = false;
           _codigoEnEspera = '';
@@ -377,7 +403,8 @@ class _VentasPageState extends State<VentasPage> {
             onPressed: () {
               DialogosLector.confirmarBorrarTodo(
                 context: context,
-                onConfirm: () => context.read<VentaProvider>().borrarTodasLasLecturas(),
+                onConfirm: () =>
+                    context.read<VentaProvider>().borrarTodasLasLecturas(),
               );
             },
             tooltip: 'Borrar todas las lecturas',
@@ -403,7 +430,6 @@ class _VentasPageState extends State<VentasPage> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          
           Widget tablaLecturas = LecturasDataTable(
             provider: provider,
             // Con documento activo, lo leído fuera de él va en rojo.
@@ -414,7 +440,8 @@ class _VentasPageState extends State<VentasPage> {
               DialogosLector.mostrarDialogoEdicion(
                 context: ctx,
                 viewModel: vm,
-                onDelete: (itemViewModel) => prov.borrarLectura(itemViewModel.lectura),
+                onDelete: (itemViewModel) =>
+                    prov.borrarLectura(itemViewModel.lectura),
                 onEdit: (itemViewModel, nuevaCantidad) => prov.editarLectura(
                   lecturaViewModel: itemViewModel,
                   nuevaCantidad: nuevaCantidad,

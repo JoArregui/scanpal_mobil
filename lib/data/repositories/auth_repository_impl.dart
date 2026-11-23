@@ -1,11 +1,10 @@
+// ignore_for_file: avoid_print
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_datasource.dart';
-
 import '../datasources/auth_local_datasource.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
-
   final AuthLocalDataSource localDataSource;
 
   AuthRepositoryImpl({
@@ -16,9 +15,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<bool> login(String nombre, String password) async {
     try {
-      final userCode = await remoteDataSource.login(nombre, password);
+      final token = await remoteDataSource.loginWithToken(nombre, password);
 
-      if (userCode > 0) {
+      if (token != null) {
+        await localDataSource.saveToken(token);
+        final userCode = await remoteDataSource.getUserCodeFromToken(token);
         await localDataSource.saveUserCode(userCode);
         return true;
       }
@@ -31,6 +32,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> clearSession() async {
-    return await localDataSource.clearUserCode();
+    await localDataSource.clearUserCode();
+    await localDataSource.clearToken();
   }
 }

@@ -32,10 +32,10 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
   Future<void> _cargarDatosIniciales() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      
+
       final lectorProvider = context.read<LectorProvider>();
       await lectorProvider.obtenerHistorialPorFecha(_fechaSeleccionada);
-      
+
       if (!mounted) return;
       await _cargarDiasConDatos();
     });
@@ -130,9 +130,14 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
 
     // BOM para que Excel abra bien los acentos; ';' como separador (ES).
     final buffer = StringBuffer('\uFEFF');
-    buffer.writeln('HORA;CODIGO;REFERENCIA;CANTIDAD;USUARIO;LOTE;DESCRIPCION;CADUCIDAD');
+    buffer.writeln(
+      'FECHA_ENVIO;HORA;CODIGO;REFERENCIA;CANTIDAD;USUARIO;LOTE;DESCRIPCION;CADUCIDAD',
+    );
 
     for (final r in registros) {
+      final fechaEnvio = r.fechaEnvio != null
+          ? DateFormat('dd/MM/yyyy').format(r.fechaEnvio!)
+          : '';
       final hora = r.fechaEnvio != null
           ? DateFormat('HH:mm:ss').format(r.fechaEnvio!)
           : '';
@@ -140,7 +145,8 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
           ? DateFormat('dd/MM/yyyy').format(r.fechaCaducidad!)
           : '';
       buffer.writeln(
-        '$hora;${_campoCsv(r.codigoArticulo)};${_campoCsv(r.referenciaArticulo)};'
+        '$fechaEnvio;$hora;${_campoCsv(r.codigoArticulo)};'
+        '${_campoCsv(r.referenciaArticulo)};'
         '${r.cantidad.toInt()};${r.idUsuario};${_campoCsv(r.lote)};'
         '${_campoCsv(r.descripcion)};$caducidad',
       );
@@ -172,23 +178,25 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
     final messenger = ScaffoldMessenger.of(context);
     final provider = context.read<LectorProvider>();
     final registros = provider.historialLecturas;
-    
+
     if (registros.isEmpty) return;
 
     final usuarios = registros.map((r) => r.idUsuario).toSet().toList()..sort();
     final usuariosTxt = usuarios.join(', ');
 
-    String contenido = 'COMPROBANTE DE SINCRONIZACIÓN - API\n'
+    String contenido =
+        'COMPROBANTE DE SINCRONIZACIÓN - API\n'
         'FECHA DE CONSULTA: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}\n'
         'FECHA DE REGISTROS: ${DateFormat('dd/MM/yyyy').format(_fechaSeleccionada)}\n'
         'USUARIO(S): $usuariosTxt\n'
         '==========================================\n\n';
 
     for (final r in registros) {
-      final hora = r.fechaEnvio != null
-          ? DateFormat('HH:mm:ss').format(r.fechaEnvio!)
-          : '--:--';
-      contenido += '[$hora] COD: ${r.codigoArticulo}\n'
+      final fechaHoraEnvio = r.fechaEnvio != null
+          ? DateFormat('dd/MM/yyyy HH:mm:ss').format(r.fechaEnvio!)
+          : '--/--/---- --:--';
+      contenido +=
+          '[$fechaHoraEnvio] COD: ${r.codigoArticulo}\n'
           'REF: ${r.referenciaArticulo} | CANT: ${r.cantidad.toInt()} | USU: ${r.idUsuario}\n'
           'LOTE: ${r.lote ?? "-"}\n'
           'DESC: ${r.descripcion ?? "-"}\n'
@@ -249,7 +257,9 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
               );
 
               if (mounted) {
-                await lectorProvider.obtenerHistorialPorFecha(_fechaSeleccionada);
+                await lectorProvider.obtenerHistorialPorFecha(
+                  _fechaSeleccionada,
+                );
                 await _cargarDiasConDatos();
               }
             },
@@ -261,6 +271,63 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmarBorrarTodasLasLecturas() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Borrar todas las lecturas'),
+        content: const Text(
+          'Se eliminarán permanentemente de este dispositivo todas las lecturas, '
+          'enviadas y pendientes, de inventario, compras y ventas. '
+          'Esta acción no se puede deshacer.\n\n¿Desea continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'BORRAR TODO',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmar != true) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final borrados = await db.delete(DatabaseHelper.tableNameLecturas);
+
+      if (!mounted) return;
+      final lectorProvider = context.read<LectorProvider>();
+      await lectorProvider.obtenerLecturasPendientes();
+      await lectorProvider.obtenerHistorialPorFecha(
+        _fechaSeleccionada,
+      );
+      await _cargarDiasConDatos();
+      if (!mounted) return;
+
+      messenger.showSnackBar(
+        SnackBar(content: Text('$borrados lecturas eliminadas.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Error al borrar las lecturas: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -276,7 +343,9 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
           IconButton(
             icon: const Icon(Icons.share_outlined),
             tooltip: 'Compartir Comprobante',
-            onPressed: registros.isEmpty ? null : () => _elegirFormatoCompartir(),
+            onPressed: registros.isEmpty
+                ? null
+                : () => _elegirFormatoCompartir(),
           ),
           IconButton(
             icon: const Icon(Icons.cleaning_services_outlined),
@@ -284,9 +353,17 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
             onPressed: _confirmarLimpieza,
           ),
           IconButton(
-            icon: Icon(_mostrarCalendario ? Icons.keyboard_arrow_up : Icons.event_note),
+            icon: const Icon(Icons.delete_forever_outlined),
+            tooltip: 'Borrar todas las lecturas',
+            onPressed: _confirmarBorrarTodasLasLecturas,
+          ),
+          IconButton(
+            icon: Icon(
+              _mostrarCalendario ? Icons.keyboard_arrow_up : Icons.event_note,
+            ),
             tooltip: 'Cambiar Fecha',
-            onPressed: () => setState(() => _mostrarCalendario = !_mostrarCalendario),
+            onPressed: () =>
+                setState(() => _mostrarCalendario = !_mostrarCalendario),
           ),
         ],
       ),
@@ -337,8 +414,10 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
         },
         eventLoader: (day) {
           // Buscamos si el día evaluado está en nuestro Set de la DB
-          final bool tieneDatos = _diasConDatos.any((d) => 
-            d.year == day.year && d.month == day.month && d.day == day.day);
+          final bool tieneDatos = _diasConDatos.any(
+            (d) =>
+                d.year == day.year && d.month == day.month && d.day == day.day,
+          );
           return tieneDatos ? ['sincronizado'] : [];
         },
         calendarStyle: CalendarStyle(
@@ -368,13 +447,12 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
 
   Widget _buildHeaderInfo(List<Lectura> registros) {
     final total = registros.length;
-    final usuarios = registros.map((r) => r.idUsuario).toSet().toList()
-      ..sort();
+    final usuarios = registros.map((r) => r.idUsuario).toSet().toList()..sort();
     final usuariosTxt = usuarios.isEmpty
         ? '-'
         : usuarios.length == 1
-            ? 'Usuario: ${usuarios.first}'
-            : 'Usuarios: ${usuarios.join(', ')}';
+        ? 'Usuario: ${usuarios.first}'
+        : 'Usuarios: ${usuarios.join(', ')}';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -491,7 +569,11 @@ class _HistorialEnviosPageState extends State<HistorialEnviosPage> {
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, size: 12, color: Colors.green),
+                    const Icon(
+                      Icons.person_outline,
+                      size: 12,
+                      color: Colors.green,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Usu: ${item.idUsuario}',
@@ -615,11 +697,7 @@ class _TituloMarqueeState extends State<_TituloMarquee> {
       controller: _controller,
       scrollDirection: Axis.horizontal,
       physics: const ClampingScrollPhysics(),
-      child: Text(
-        widget.text,
-        maxLines: 1,
-        softWrap: false,
-      ),
+      child: Text(widget.text, maxLines: 1, softWrap: false),
     );
   }
 }

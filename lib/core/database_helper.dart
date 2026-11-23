@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 class DatabaseHelper {
   static const _databaseName = "ScanPalDB.db";
-  static const _databaseVersion = 3;
+  static const _databaseVersion = 4;
 
   // ==================== TABLA LECTURAS ====================
   static const tableNameLecturas = 'lecturas';
@@ -142,6 +142,8 @@ class DatabaseHelper {
       )
     ''');
 
+    await _crearTablaDuplicados(db);
+
     await db.execute('''
       CREATE TABLE $tableNameLogs (
         $colLogId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,6 +187,7 @@ class DatabaseHelper {
   /// Migraciones:
   /// v1 → v2: trazabilidad GS1-128 en lecturas (columnas en NULL).
   /// v2 → v3: tabla de documentos esperados (albarán/factura).
+  /// v3 → v4: tabla de artículos duplicados.
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(
@@ -219,6 +222,31 @@ class DatabaseHelper {
         debugPrint('⬆️ [DB_HELPER] Migración a v3: tabla documentos creada.');
       }
     }
+    if (oldVersion < 4) {
+      await _crearTablaDuplicados(db);
+      if (kDebugMode) {
+        debugPrint(
+          '⬆️ [DB_HELPER] Migración a v4: tabla de artículos duplicados creada.',
+        );
+      }
+    }
+  }
+
+  Future<void> _crearTablaDuplicados(DatabaseExecutor executor) async {
+    await executor.execute('''
+      CREATE TABLE IF NOT EXISTS $tableNameDuplicados (
+        $colDupId INTEGER PRIMARY KEY AUTOINCREMENT,
+        $colArtCodigo TEXT NOT NULL,
+        $colArtDescripcion TEXT NOT NULL,
+        $colArtReferencia TEXT NOT NULL,
+        $colArtLote TEXT,
+        $colArtCantidadMinima INTEGER NOT NULL,
+        $colArtDescatalogado INTEGER NOT NULL DEFAULT 0,
+        $colArtGestionLotes INTEGER NOT NULL DEFAULT 0,
+        $colDupMotivo TEXT,
+        $colDupFechaDeteccion TEXT NOT NULL
+      )
+    ''');
   }
 
   void invalidate() {

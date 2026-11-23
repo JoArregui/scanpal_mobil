@@ -1,8 +1,10 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../core/exceptions.dart';
+import '../../data/datasources/auth_local_datasource.dart';
 import '../../domain/entities/articulo.dart';
+import '../../data/models/articulo_model.dart';
 import '../../domain/repositories/configuracion_repository.dart';
 
 abstract class ArticuloRemoteDataSource {
@@ -14,7 +16,7 @@ abstract class ArticuloRemoteDataSource {
     int cantidadMinima,
     String referencia,
     String? lote,
-    bool descatalogado, 
+    bool descatalogado,
     bool gestionLotes,
   );
 }
@@ -22,11 +24,22 @@ abstract class ArticuloRemoteDataSource {
 class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
   final http.Client client;
   final ConfiguracionRepository configRepository;
+  final AuthLocalDataSource authLocalDataSource;
 
   ArticuloRemoteDataSourceImpl({
     required this.client,
     required this.configRepository,
+    required this.authLocalDataSource,
   });
+
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await authLocalDataSource.getToken();
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
 
   Future<String> _buildUrl(String path) async {
     final config = await configRepository.getConfiguracion();
@@ -36,8 +49,8 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
       throw ServerException('URL base no configurada.');
     }
 
-    final sanitizedUrlBase = urlBase.endsWith('/') 
-        ? urlBase.substring(0, urlBase.length - 1) 
+    final sanitizedUrlBase = urlBase.endsWith('/')
+        ? urlBase.substring(0, urlBase.length - 1)
         : urlBase;
 
     return '$sanitizedUrlBase/$path';
@@ -45,26 +58,28 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
 
   @override
   Future<Articulo> getArticulo(String codigo) async {
-    final url = await _buildUrl('articulo/GetCodigos');
+    final url = await _buildUrl('api/Articulo/GetCodigos');
     final uri = Uri.parse('$url?Filtro=CodigoBarras=\'$codigo\'');
 
     try {
       final response = await client.get(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await _authHeaders(),
       );
 
       if (response.statusCode == 200) {
         final String responseBody = utf8.decode(response.bodyBytes);
         final List<dynamic> jsonList = json.decode(responseBody);
-        
+
         if (jsonList.isEmpty) {
           throw NotFoundException(
             'Artículo no encontrado con el código: $codigo',
           );
         }
 
-        return Articulo.fromJson(jsonList.first as Map<String, dynamic>);
+        return ArticuloModel.fromJson(
+          jsonList.first as Map<String, dynamic>,
+        ).toEntity();
       } else {
         throw ServerException(
           'Error al buscar artículo: ${response.statusCode}',
@@ -79,33 +94,31 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
 
   @override
   Future<List<Articulo>> getArticulos() async {
-    final url = await _buildUrl('articulo/GetCodigos');
+    final url = await _buildUrl('api/Articulo/GetCodigos');
     final uri = Uri.parse(url);
 
     debugPrint('🌐 [REMOTE_DS] Conectando a: $uri');
 
     try {
-      final response = await client.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(minutes: 5));
+      final response = await client
+          .get(
+            uri,
+            headers: await _authHeaders(),
+          )
+          .timeout(const Duration(minutes: 5));
 
       debugPrint('📥 [REMOTE_DS] HTTP Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final String decoded = utf8.decode(response.bodyBytes);
-        
-        // Validar que no sea HTML 
+
         if (decoded.trim().startsWith('<')) {
           debugPrint('❌ [REMOTE_DS] Respuesta es HTML, no JSON');
           throw ServerException('El servidor devolvió HTML en lugar de JSON');
         }
 
         final dynamic jsonData = json.decode(decoded);
-        
+
         if (jsonData is! List) {
           debugPrint('⚠️ [REMOTE_DS] JSON no es lista. Tipo: ${jsonData.runtimeType}');
           throw ServerException('Formato de respuesta inválido');
@@ -113,16 +126,16 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
 
         debugPrint('📦 [REMOTE_DS] Lista recibida con ${jsonData.length} elementos');
 
-        // Mapeo síncrono (NO usar compute en Release)
         final List<Articulo> articulos = [];
         int errores = 0;
 
         for (int i = 0; i < jsonData.length; i++) {
           try {
-            final articulo = Articulo.fromJson(jsonData[i] as Map<String, dynamic>);
+            final articulo = ArticuloModel.fromJson(
+              jsonData[i] as Map<String, dynamic>,
+            ).toEntity();
             articulos.add(articulo);
-            
-            // Log cada 1000 artículos
+
             if ((i + 1) % 1000 == 0) {
               debugPrint('📦 [REMOTE_DS] Procesados ${i + 1}/${jsonData.length}');
             }
@@ -144,10 +157,9 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
         }
 
         return articulos;
-
       } else {
-        final body = response.body.length > 200 
-            ? response.body.substring(0, 200) 
+        final body = response.body.length > 200
+            ? response.body.substring(0, 200)
             : response.body;
         debugPrint('❌ [REMOTE_DS] Error ${response.statusCode}: $body');
         throw ServerException('Error de servidor: ${response.statusCode}');
@@ -155,7 +167,7 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
     } catch (e, stack) {
       debugPrint('❌ [REMOTE_DS] Error fatal: $e');
       if (kDebugMode) debugPrint('Stack: $stack');
-      
+
       if (e is ServerException) rethrow;
       throw ServerException('Fallo de conexión: $e');
     }
@@ -171,7 +183,7 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
     bool descatalogado,
     bool gestionLotes,
   ) async {
-    final url = await _buildUrl('articulo/guardar');
+    final url = await _buildUrl('api/Articulo/Guardar');
 
     final Map<String, dynamic> body = {
       'CodigoBarras': codigo,
@@ -179,14 +191,14 @@ class ArticuloRemoteDataSourceImpl implements ArticuloRemoteDataSource {
       'CantidadMinima': cantidadMinima,
       'Referencia': referencia,
       'Lote': lote,
-      'Descatalogado': descatalogado ? 1 : 0, 
+      'Descatalogado': descatalogado ? 1 : 0,
       'GestionLotes': gestionLotes ? 1 : 0,
     };
 
     try {
       final response = await client.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _authHeaders(),
         body: json.encode(body),
       );
 

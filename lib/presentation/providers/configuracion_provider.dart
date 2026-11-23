@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/configuracion.dart';
 import '../../domain/usecases/get_configuracion_usecase.dart';
@@ -44,18 +45,21 @@ class ConfiguracionProvider with ChangeNotifier {
 
   /// Guarda la nueva configuración y actualiza el estado global
   Future<bool> guardarConfiguracion(
-    String url, 
-    int cantidad, 
-    {required bool lecturaAutomatica}
-  ) async {
+    String url,
+    int cantidad, {
+    required bool lecturaAutomatica,
+    required int intervaloLecturaAutomaticaSegundos,
+  }) async {
     _state = ConfiguracionState.saving;
     _errorMessage = '';
     notifyListeners();
 
     final nuevaConfig = Configuracion(
-      urlBase: url, 
+      urlBase: url,
       cantidadMinima: cantidad,
       lecturaAutomatica: lecturaAutomatica,
+      gestionLotes: _configuracion.gestionLotes,
+      intervaloLecturaAutomaticaSegundos: intervaloLecturaAutomaticaSegundos,
     );
 
     try {

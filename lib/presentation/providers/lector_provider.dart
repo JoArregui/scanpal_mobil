@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +30,6 @@ enum LectorState {
   sendingLecturas,
   sendSuccess,
   sendError,
-  noEncontradoFuzzy,
 }
 
 class LectorProvider with ChangeNotifier {
@@ -55,8 +55,6 @@ class LectorProvider with ChangeNotifier {
   List<Lectura> _historialLecturas = [];
   int _lecturasEnviadasCount = 0;
   int _currentUserId = 1;
-
-  List<Articulo> _sugerenciasFuzzy = [];
 
   // Definimos el tipo de operación (Inventario por defecto en este Provider)
   final TipoOperacion _tipo = TipoOperacion.inventario;
@@ -95,8 +93,6 @@ class LectorProvider with ChangeNotifier {
   int get lecturasEnviadasCount => _lecturasEnviadasCount;
   int get currentUserId => _currentUserId;
   int get cantidadMinimaGlobal => _configuracionActual.cantidadMinima;
-  List<Articulo> get sugerenciasFuzzy => _sugerenciasFuzzy;
-
   int get totalLecturasCantidadBaja => _registrosViewModel
       .where((vm) => vm.cantidad < cantidadMinimaGlobal)
       .length;
@@ -114,8 +110,14 @@ class LectorProvider with ChangeNotifier {
     }
   }
 
-  Future<void> refrescarUsuarioDinamico() async =>
-      await _cargarUsuarioLogueado();
+  Future<void> refrescarUsuarioDinamico({int? userCode}) async {
+    final int? code = userCode ?? await authLocalDataSource.getUserCode();
+    _currentUserId = (code != null && code != 0) ? code : 1;
+    if (kDebugMode) {
+      print('👤 [AUTH] Usuario dinámico asignado: $_currentUserId');
+    }
+    notifyListeners();
+  }
 
   Future<void> _loadConfiguracionInicial() async {
     try {
@@ -241,34 +243,11 @@ class LectorProvider with ChangeNotifier {
       if (art != null) {
         _procesarArticuloEncontrado(art);
       } else {
-        // [NUEVO] Fallback 4: Búsqueda fuzzy por dígitos numéricos
-        if (kDebugMode) {
-          print('🔍 [FUZZY] Iniciando búsqueda fuzzy para: "$cod"');
-        }
-        final sugerencias = await buscarArticuloUseCase.executeFuzzy(cod);
-
-        if (sugerencias.isNotEmpty) {
-          // Hay sugerencias: notificar a la UI para mostrar el selector
-          _sugerenciasFuzzy = sugerencias;
-          _errorMessage =
-              '⚠️ Código no reconocido. Selecciona el artículo correcto.';
-          _state = LectorState.noEncontradoFuzzy;
-          if (kDebugMode) {
-            print('🔍 [FUZZY] ${sugerencias.length} sugerencias encontradas');
-          }
-          notifyListeners();
-        } else {
-          await _setArticuloNoEncontrado();
-        }
+        await _setArticuloNoEncontrado();
       }
     } catch (e) {
       await _setArticuloNoEncontrado();
     }
-  }
-
-  void seleccionarArticuloDeSugerencia(Articulo articulo) {
-    _sugerenciasFuzzy = [];
-    _procesarArticuloEncontrado(articulo);
   }
 
   void _procesarArticuloEncontrado(Articulo art) async {
@@ -287,7 +266,7 @@ class LectorProvider with ChangeNotifier {
   }
 
   Future<void> _setArticuloNoEncontrado() async {
-    _errorMessage = '❌ CÓDIGO DE BARRAS NO ENCONTRADO';
+    _errorMessage = '❌ ARTÍCULO NO LOCAL: código de barras no encontrado.';
     _state = LectorState.error;
     await _playSound(AppConstants.soundErrorNoEncontrado);
     notifyListeners();
@@ -307,13 +286,23 @@ class LectorProvider with ChangeNotifier {
     double? pesoBruto,
     String? sscc,
   }) async {
+    final codigoLimpio = _limpiarTexto(codigo);
+    if (_articuloEncontrado == null ||
+        _articuloEncontrado!.codigo != codigoLimpio) {
+      _errorMessage =
+          'No se puede registrar la lectura: el artículo no existe o no está seleccionado.';
+      _state = LectorState.error;
+      notifyListeners();
+      return false;
+    }
+
     _state = LectorState.registering;
     notifyListeners();
 
     final double cantAFijar = (cantidad == null || cantidad <= 0)
         ? (_configuracionActual.cantidadMinima > 0
-            ? _configuracionActual.cantidadMinima.toDouble()
-            : 0.0)
+              ? _configuracionActual.cantidadMinima.toDouble()
+              : 0.0)
         : cantidad;
 
     if (cantAFijar <= 0) {
@@ -346,8 +335,12 @@ class LectorProvider with ChangeNotifier {
       _state = LectorState.initial;
       notifyListeners();
       return true;
-    } catch (e) {
-      _errorMessage = 'Error al registrar lectura.';
+    } catch (e, stackTrace) {
+      _errorMessage = 'Error al registrar lectura: $e';
+      if (kDebugMode) {
+        debugPrint('❌ [LECTOR] Error registrando lectura: $e');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       _state = LectorState.error;
       notifyListeners();
       return false;
@@ -474,13 +467,16 @@ class LectorProvider with ChangeNotifier {
     try {
       final db = await DatabaseHelper.instance.database;
       // Consultamos solo las fechas únicas que tienen registros sincronizados para este tipo de operación
-      final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      final List<Map<String, dynamic>> maps = await db.rawQuery(
+        '''
         SELECT DISTINCT substr(${DatabaseHelper.colFechaEnvio}, 1, 10) as fecha 
         FROM ${DatabaseHelper.tableNameLecturas} 
         WHERE ${DatabaseHelper.colSincronizado} = 1 
         AND ${DatabaseHelper.colTipoOperacion} = ?
         AND ${DatabaseHelper.colFechaEnvio} IS NOT NULL
-      ''', [_tipo.name]);
+      ''',
+        [_tipo.name],
+      );
 
       return List.generate(maps.length, (i) {
         return DateTime.parse(maps[i]['fecha']);

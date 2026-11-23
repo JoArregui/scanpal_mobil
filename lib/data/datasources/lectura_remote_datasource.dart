@@ -1,9 +1,11 @@
+// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../core/exceptions.dart';
 import '../../core/constants.dart';
 import '../../core/services/logger_service.dart';
+import '../../data/datasources/auth_local_datasource.dart';
 import '../../../domain/entities/lectura.dart';
 import '../../../domain/entities/tipo_operacion.dart';
 import '../../../domain/repositories/configuracion_repository.dart';
@@ -15,37 +17,47 @@ abstract class LecturaRemoteDataSource {
 class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
   final http.Client client;
   final ConfiguracionRepository configRepository;
+  final AuthLocalDataSource authLocalDataSource;
   final LoggerService _logger = LoggerService();
 
   LecturaRemoteDataSourceImpl({
     required this.client,
     required this.configRepository,
+    required this.authLocalDataSource,
   });
 
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await authLocalDataSource.getToken();
+    if (token == null || token.isEmpty) {
+      throw const ServerException(
+        'No hay token autenticado para enviar lecturas.',
+      );
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
 
   String _limpiarTexto(String texto) {
     return texto.replaceAll(String.fromCharCode(160), ' ').trim();
   }
 
-  /// Formatea la fecha con hora para el Servidor (YYYY-MM-DD HH:mm:ss)
   String _formatearFecha(DateTime fecha) {
-  return "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')} "
-         "${fecha.hour.toString().padLeft(2, '0')}:${fecha.minute.toString().padLeft(2, '0')}:${fecha.second.toString().padLeft(2, '0')}";
-}
+    return fecha.toIso8601String();
+  }
 
-  /// INT si la cantidad es entera (contrato histórico con el servidor),
-  /// DOUBLE si trae decimales (pesos GS1 310n/330n). Antes se truncaba con
-  /// toInt() y un peso de 0.035 kg llegaba como 0.
   dynamic _cantidadParaServidor(double cantidad) {
     return cantidad == cantidad.truncateToDouble()
         ? cantidad.toInt()
         : cantidad;
   }
 
-  /// Fecha de caducidad en formato corto (YYYY-MM-DD) o "" si no hay.
   String _formatearFechaCorta(DateTime? fecha) {
-    if (fecha == null) return "";
-    return "${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}";
+    if (fecha == null) return '';
+    return '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
   }
 
   Future<String> _buildUrl(String path) async {
@@ -66,9 +78,8 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
   Future<void> sendLecturas(List<Lectura> lecturas) async {
     if (lecturas.isEmpty) return;
 
-    final url = await _buildUrl('Lectura/Guardar');
-    // Esta fecha es la que marcará el historial de seguridad local
-    final DateTime ahora = DateTime.now();
+    final url = await _buildUrl('api/Lectura/Guardar');
+    final DateTime fechaEnvioFallback = DateTime.now();
 
     await _logger.log(
       'Iniciando envío de ${lecturas.length} lecturas a $url',
@@ -90,7 +101,6 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
             ? _limpiarTexto(lectura.lote!)
             : null;
 
-        // Lógica de separación de referencia/lote por "/"
         if (refOriginal.contains('/')) {
           final partes = refOriginal.split('/');
           parteReferencia = partes[0].trim();
@@ -104,41 +114,42 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
           '',
         );
 
-        // Mapeo del tipo (I=Inventario, C=Compra, V=Venta)
-        String tipoWS = "I";
+        String tipoWS = 'I';
         switch (lectura.tipoOperacion) {
           case TipoOperacion.inventario:
-            tipoWS = "I";
+            tipoWS = 'I';
             break;
           case TipoOperacion.compra:
-            tipoWS = "C";
+            tipoWS = 'C';
             break;
           case TipoOperacion.venta:
-            tipoWS = "V";
+            tipoWS = 'V';
             break;
         }
 
         return {
-          "Referencia": int.tryParse(soloNumerosRef) ?? 0,
-          "CodigoBarras": _limpiarTexto(lectura.codigoArticulo),
-          "Cantidad": _cantidadParaServidor(lectura.cantidad),
-          "Usuario": lectura.idUsuario,
-          "Lote": parteLote ?? "",
-          "FechaEnvio": _formatearFecha(ahora),
-          "Tipo": tipoWS,
-          // Trazabilidad GS1-128 (el servidor ignora lo que no use).
-          "FechaCaducidad": _formatearFechaCorta(lectura.fechaCaducidad),
-          "PesoNeto": lectura.pesoNeto,
-          "PesoBruto": lectura.pesoBruto,
-          "SSCC": lectura.sscc != null ? _limpiarTexto(lectura.sscc!) : "",
+          'Referencia': int.tryParse(soloNumerosRef) ?? 0,
+          'CodigoBarras': _limpiarTexto(lectura.codigoArticulo),
+          'Cantidad': _cantidadParaServidor(lectura.cantidad),
+          'Usuario': lectura.idUsuario,
+          'Lote': parteLote ?? '',
+          'FechaEnvio': _formatearFecha(
+            lectura.fechaEnvio ?? fechaEnvioFallback,
+          ),
+          'Tipo': tipoWS,
+          'FechaCaducidad': _formatearFechaCorta(lectura.fechaCaducidad),
+          'PesoNeto': lectura.pesoNeto,
+          'PesoBruto': lectura.pesoBruto,
+          'SSCC': lectura.sscc != null ? _limpiarTexto(lectura.sscc!) : '',
         };
       }).toList();
 
       final String jsonBody = jsonEncode(listaPayload);
 
-      // Log técnico para validar el ID de usuario antes de la petición
       if (kDebugMode) {
-        print('🚀 [API_SEND] Paquete $nPaquete (Usuario ${listaPayload[0]['Usuario']}): $jsonBody');
+        print(
+          '🚀 [API_SEND] Paquete $nPaquete (Usuario ${listaPayload[0]['Usuario']}): $jsonBody',
+        );
       }
 
       bool success = false;
@@ -146,26 +157,46 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
 
       while (!success && attempts < AppConstants.maxRetries) {
         attempts++;
+        var successfulResponseReceived = false;
         try {
-          final response = await client.post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json', 
-              'Accept': 'application/json'
-            },
-            body: jsonBody,
-          ).timeout(const Duration(seconds: AppConstants.apiTimeoutSeconds));
+          final response = await client
+              .post(
+                Uri.parse(url),
+                headers: await _authHeaders(),
+                body: jsonBody,
+              )
+              .timeout(const Duration(seconds: AppConstants.apiTimeoutSeconds));
 
           if (response.statusCode >= 200 && response.statusCode < 300) {
-            final jsonResponse = jsonDecode(response.body);
-            final int recibidas = int.tryParse(jsonResponse['LecturasRecibidas']?.toString() ?? '0') ?? 0;
+            successfulResponseReceived = true;
+            await _logger.log(
+              'Respuesta paquete $nPaquete: HTTP ${response.statusCode}; cuerpo: ${response.body}',
+              level: 'INFO',
+              paquete: nPaquete,
+            );
+            final dynamic decodedResponse = jsonDecode(response.body);
+            int? recibidas;
+
+            if (decodedResponse is Map) {
+              for (final entry in decodedResponse.entries) {
+                if (entry.key.toString().toLowerCase() == 'lecturasrecibidas') {
+                  recibidas = int.tryParse(entry.value.toString());
+                  break;
+                }
+              }
+            }
+
+            if (recibidas == null) {
+              throw const ServerException(
+                'La respuesta del servidor no contiene un número válido de lecturas recibidas.',
+              );
+            }
 
             if (recibidas != listaPayload.length) {
-             
               throw ServerException(
-                recibidas == 0 
-                ? 'El Servidor rechazó los datos (Recibidas: 0). Verifique si el Usuario ${listaPayload[0]['Usuario']} tiene permisos en el Servidor.'
-                : 'Desfase: Enviadas ${listaPayload.length}, Servidor recibió $recibidas.'
+                recibidas == 0
+                    ? 'El Servidor rechazó los datos (Recibidas: 0). Usuario ${listaPayload[0]['Usuario']}. Respuesta: ${response.body}'
+                    : 'Desfase: Enviadas ${listaPayload.length}, Servidor recibió $recibidas.',
               );
             }
 
@@ -176,7 +207,9 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
               paquete: nPaquete,
             );
           } else {
-            throw ServerException('Servidor respondió error ${response.statusCode}: ${response.body}');
+            throw ServerException(
+              'Servidor respondió error ${response.statusCode}: ${response.body}',
+            );
           }
         } catch (e) {
           await _logger.log(
@@ -184,6 +217,14 @@ class LecturaRemoteDataSourceImpl implements LecturaRemoteDataSource {
             level: 'WARNING',
             paquete: nPaquete,
           );
+          if (successfulResponseReceived) {
+            await _logger.log(
+              'El servidor respondió correctamente por HTTP, pero no confirmó todas las lecturas; no se repetirá el paquete para evitar duplicados.',
+              level: 'CRITICAL',
+              paquete: nPaquete,
+            );
+            rethrow;
+          }
           if (attempts >= AppConstants.maxRetries) {
             await _logger.log(
               'Sincronización abortada por errores persistentes',

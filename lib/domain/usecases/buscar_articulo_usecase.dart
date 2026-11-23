@@ -7,10 +7,9 @@ class BuscarArticuloUseCase {
   BuscarArticuloUseCase(this.repository);
 
   /// Ejecuta la búsqueda de un artículo por código o referencia.
-  /// Implementa una lógica de cascada:
+  /// Implementa una búsqueda exacta:
   /// 1. Busca en la tabla principal (Artículos operativos).
   /// 2. Si no lo encuentra, busca en la tabla de duplicados/auditoría.
-  /// 3. Si tampoco, busca por texto libre en descripción, código y referencia.
   Future<Articulo?> execute(String codigo) async {
     final String valorBusqueda = codigo.trim();
 
@@ -37,24 +36,7 @@ class BuscarArticuloUseCase {
       return articuloDuplicado;
     }
 
-    // 3. Fallback por texto libre: busca con LIKE en descripción, código y referencia.
-    // Útil para etiquetas fitosanitarias (Nava) donde el lote escaneado puede coincidir
-    // parcialmente con la descripción o referencia del artículo en BD.
-    final List<Articulo> porDescripcion = await repository
-        .buscarArticulosPorTexto(valorBusqueda);
-
-    if (porDescripcion.length == 1) {
-      // Coincidencia única: devolvemos directamente
-      return porDescripcion.first;
-    }
-
-    if (porDescripcion.length > 1) {
-      // Varias coincidencias: devolvemos la primera (ORDER BY descripcion ASC de la BD).
-      // El provider mostrará el resultado y el usuario podrá confirmar o corregir.
-      return porDescripcion.first;
-    }
-
-    // 4. No encontrado en ninguna fuente
+    // 3. No encontrado en ninguna fuente
     return null;
   }
 

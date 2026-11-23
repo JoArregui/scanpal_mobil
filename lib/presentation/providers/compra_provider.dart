@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -214,7 +215,6 @@ class CompraProvider with ChangeNotifier {
       } else {
         _errorMessage = '❌ ARTÍCULO NO ENCONTRADO';
         _state = CompraState.error;
-        await _playSound(AppConstants.soundErrorNoEncontrado);
       }
     } catch (e) {
       _state = CompraState.error;
@@ -224,7 +224,7 @@ class CompraProvider with ChangeNotifier {
   }
 
   // --- Registro de Lecturas ---
-  
+
   Future<bool> registrarLectura(
     String codigo,
     double? cantidad,
@@ -237,6 +237,16 @@ class CompraProvider with ChangeNotifier {
     double? pesoBruto,
     String? sscc,
   }) async {
+    final codigoLimpio = _limpiarTexto(codigo);
+    if (_articuloEncontrado == null ||
+        _articuloEncontrado!.codigo != codigoLimpio) {
+      _errorMessage =
+          'No se puede registrar la lectura: el artículo no existe o no está seleccionado.';
+      _state = CompraState.error;
+      notifyListeners();
+      return false;
+    }
+
     _state = CompraState.registering;
     notifyListeners();
 
@@ -269,8 +279,12 @@ class CompraProvider with ChangeNotifier {
       _state = CompraState.initial;
       notifyListeners();
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
+    } catch (e, stackTrace) {
+      _errorMessage = 'Error al registrar lectura: $e';
+      if (kDebugMode) {
+        debugPrint('❌ [COMPRA] Error registrando lectura: $e');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       _state = CompraState.error;
       notifyListeners();
       return false;

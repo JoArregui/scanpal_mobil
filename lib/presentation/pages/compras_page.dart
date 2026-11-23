@@ -16,6 +16,7 @@ import '../widgets/lecturas_data_table.dart';
 import '../widgets/dialogos_lector.dart';
 import '../widgets/dialogo_registro_articulo.dart';
 import '../widgets/documento_panel.dart';
+import '../utils/lectura_feedback.dart';
 
 class ComprasPage extends StatefulWidget {
   const ComprasPage({super.key});
@@ -47,7 +48,6 @@ class _ComprasPageState extends State<ComprasPage> {
   // ======== DEBOUNCE / ANTIREBOTE ========
   bool _canRead = true;
   Timer? _bloqueoTimer;
-  final Duration _tiempoBloqueo = const Duration(seconds: 3);
 
   @override
   void initState() {
@@ -72,9 +72,9 @@ class _ComprasPageState extends State<ComprasPage> {
 
     // Estado inicial de la comprobación si hay documento activo.
     if (!mounted) return;
-    await context
-        .read<ComprobacionProvider>()
-        .refrescarTipo(TipoOperacion.compra);
+    await context.read<ComprobacionProvider>().refrescarTipo(
+      TipoOperacion.compra,
+    );
   }
 
   @override
@@ -120,7 +120,9 @@ class _ComprasPageState extends State<ComprasPage> {
 
     setState(() {
       if (codigo == _codigoEnEspera) {
-        _conteoEstabilidad++;
+        if (_conteoEstabilidad < _umbralesEstabilidad) {
+          _conteoEstabilidad++;
+        }
       } else {
         _codigoEnEspera = codigo;
         _conteoEstabilidad = 1;
@@ -153,7 +155,11 @@ class _ComprasPageState extends State<ComprasPage> {
   void _iniciarBloqueoTemporal() {
     setState(() => _canRead = false);
     _bloqueoTimer?.cancel();
-    _bloqueoTimer = Timer(_tiempoBloqueo, () {
+    final segundos = context
+        .read<ConfiguracionProvider>()
+        .configuracion
+        .intervaloLecturaAutomaticaSegundos;
+    _bloqueoTimer = Timer(Duration(seconds: segundos), () {
       if (mounted) {
         setState(() => _canRead = true);
       }
@@ -169,9 +175,9 @@ class _ComprasPageState extends State<ComprasPage> {
 
     setState(() {
       _isProcessing = true;
+      _canRead = false;
       _cameraActive = false;
       _torchOn = false;
-      _ultimoCodigoEscaneado = rawCodigo;
     });
 
     await cameraController.stop();
@@ -187,6 +193,7 @@ class _ComprasPageState extends State<ComprasPage> {
 
     if (provider.state == CompraState.loadedArticulo ||
         provider.state == CompraState.descatalogadoArticulo) {
+      setState(() => _ultimoCodigoEscaneado = rawCodigo);
       final articulo = provider.articuloEncontrado!;
       final descripcionLimpia = _limpiarDescripcion(
         articulo.descripcion,
@@ -195,16 +202,15 @@ class _ComprasPageState extends State<ComprasPage> {
 
       final double cantidadFinal =
           barcode.cantidad ?? config.cantidadMinima.toDouble();
-
-      bool tieneLoteSiLoRequiere =
-          !articulo.gestionLotes ||
-          (articulo.gestionLotes && barcode.lote != null);
+      final bool tieneLoteSiLoRequiere =
+          !(config.gestionLotes && articulo.gestionLotes) ||
+          (barcode.lote?.trim().isNotEmpty ?? false);
 
       if (config.lecturaAutomatica &&
           !articulo.descatalogado &&
           tieneLoteSiLoRequiere &&
           cantidadFinal > 0) {
-        await provider.registrarLectura(
+        final registroCorrecto = await provider.registrarLectura(
           articulo.codigo,
           cantidadFinal,
           descripcionLimpia,
@@ -216,26 +222,35 @@ class _ComprasPageState extends State<ComprasPage> {
           sscc: barcode.scc,
         );
 
-        // Actualiza el estado de las líneas del documento en vivo.
-        if (mounted) {
-          await context
-              .read<ComprobacionProvider>()
-              .refrescarTipo(TipoOperacion.compra);
-        }
-
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '✅ Registro de Compra: ${barcode.lote ?? "Sin lote"}',
+        if (registroCorrecto) {
+          await LecturaFeedback.correcta();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✅ Registro de Compra: ${barcode.lote ?? "Sin lote"}',
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(milliseconds: 700),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(milliseconds: 700),
-          ),
-        );
-
-        _iniciarBloqueoTemporal();
+          );
+          _iniciarBloqueoTemporal();
+          await context.read<ComprobacionProvider>().refrescarTipo(
+            TipoOperacion.compra,
+          );
+        } else {
+          await LecturaFeedback.error();
+          if (!mounted) return;
+          _iniciarBloqueoTemporal();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(provider.errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
 
         setState(() {
           _isProcessing = false;
@@ -254,6 +269,8 @@ class _ComprasPageState extends State<ComprasPage> {
             cantidadConfigurada: cantidadFinal.toInt(),
             descripcionLimpia: descripcionLimpia,
             provider: provider,
+            gestionLotesHabilitada:
+                config.gestionLotes && articulo.gestionLotes,
             loteExtraido: barcode.lote,
             fechaExtraida: barcode.fechaCaducidad,
             pesoNetoExtraido: double.tryParse(barcode.pesoNeto ?? ''),
@@ -264,6 +281,8 @@ class _ComprasPageState extends State<ComprasPage> {
 
         if (mounted) {
           if (resultado == true) {
+            await LecturaFeedback.correcta();
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ Registro completado'),
@@ -272,9 +291,12 @@ class _ComprasPageState extends State<ComprasPage> {
               ),
             );
             _iniciarBloqueoTemporal();
-            await context
-                .read<ComprobacionProvider>()
-                .refrescarTipo(TipoOperacion.compra);
+            await context.read<ComprobacionProvider>().refrescarTipo(
+              TipoOperacion.compra,
+            );
+          }
+          else {
+            _iniciarBloqueoTemporal();
           }
 
           setState(() {
@@ -291,6 +313,9 @@ class _ComprasPageState extends State<ComprasPage> {
       }
     } else {
       if (mounted) {
+        setState(() => _ultimoCodigoEscaneado = '');
+        await LecturaFeedback.error();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(provider.errorMessage),
@@ -298,6 +323,7 @@ class _ComprasPageState extends State<ComprasPage> {
           ),
         );
 
+        _iniciarBloqueoTemporal();
         setState(() {
           _isProcessing = false;
           _codigoEnEspera = '';
@@ -378,7 +404,8 @@ class _ComprasPageState extends State<ComprasPage> {
             onPressed: () {
               DialogosLector.confirmarBorrarTodo(
                 context: context,
-                onConfirm: () => context.read<CompraProvider>().borrarTodasLasLecturas(),
+                onConfirm: () =>
+                    context.read<CompraProvider>().borrarTodasLasLecturas(),
               );
             },
             tooltip: 'Borrar todas las compras locales',
@@ -405,7 +432,6 @@ class _ComprasPageState extends State<ComprasPage> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          
           Widget tablaLecturas = LecturasDataTable(
             provider: provider,
             // Con documento activo, lo leído fuera de él va en rojo.
@@ -446,7 +472,9 @@ class _ComprasPageState extends State<ComprasPage> {
             zoomLevel: _zoomLevel,
             onZoomChanged: (val) {
               setState(() => _zoomLevel = val);
-              cameraController.setZoomScale(val); // Método corregido para mobile_scanner
+              cameraController.setZoomScale(
+                val,
+              ); // Método corregido para mobile_scanner
             },
             conteoEstabilidad: _conteoEstabilidad,
             umbralEstabilidad: _umbralesEstabilidad,

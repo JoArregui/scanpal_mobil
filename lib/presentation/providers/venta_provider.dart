@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:intl/intl.dart';
@@ -215,7 +216,6 @@ class VentaProvider with ChangeNotifier {
       } else {
         _errorMessage = '❌ ARTÍCULO NO ENCONTRADO';
         _state = VentaState.error;
-        await _playSound(AppConstants.soundErrorNoEncontrado);
       }
     } catch (e) {
       _state = VentaState.error;
@@ -238,6 +238,16 @@ class VentaProvider with ChangeNotifier {
     double? pesoBruto,
     String? sscc,
   }) async {
+    final codigoLimpio = _limpiarTexto(codigo);
+    if (_articuloEncontrado == null ||
+        _articuloEncontrado!.codigo != codigoLimpio) {
+      _errorMessage =
+          'No se puede registrar la lectura: el artículo no existe o no está seleccionado.';
+      _state = VentaState.error;
+      notifyListeners();
+      return false;
+    }
+
     _state = VentaState.registering;
     notifyListeners();
 
@@ -270,8 +280,12 @@ class VentaProvider with ChangeNotifier {
       _state = VentaState.initial;
       notifyListeners();
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
+    } catch (e, stackTrace) {
+      _errorMessage = 'Error al registrar lectura: $e';
+      if (kDebugMode) {
+        debugPrint('❌ [VENTA] Error registrando lectura: $e');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       _state = VentaState.error;
       notifyListeners();
       return false;

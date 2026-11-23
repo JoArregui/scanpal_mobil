@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
+import '../providers/actualizar_articulo_provider.dart';
 import '../providers/login_provider.dart';
-import '../providers/configuracion_provider.dart';
-import '../providers/lector_provider.dart'; 
+import '../providers/lector_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,16 +17,14 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  static const String _fixedDbUrl = AppConstants.baseUrl;
-
   @override
   void initState() {
     super.initState();
-    // RESETEO DE ESTADO: 
-    // Aseguramos que al entrar al Login, el estado sea 'initial' 
+    // RESETEO DE ESTADO:
+    // Aseguramos que al entrar al Login, el estado sea 'initial'
     // para que no detecte un 'success' de una sesión anterior.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<LoginProvider>(context, listen: false).logout(); 
+      Provider.of<LoginProvider>(context, listen: false).logout();
       // O el método que tengas para limpiar el estado (ej. resetState)
     });
   }
@@ -82,21 +80,17 @@ class _LoginPageState extends State<LoginPage> {
     _formKey.currentState!.save();
 
     final loginProvider = Provider.of<LoginProvider>(context, listen: false);
-    final configProvider = Provider.of<ConfiguracionProvider>(context, listen: false);
-    // 1. Obtenemos el LectorProvider
     final lectorProvider = Provider.of<LectorProvider>(context, listen: false);
-
-    await configProvider.guardarConfiguracion(
-      _fixedDbUrl,
-      configProvider.configuracion.cantidadMinima,
-      lecturaAutomatica: configProvider.configuracion.lecturaAutomatica,
+    final actualizarArticuloProvider = Provider.of<ActualizarArticuloProvider>(
+      context,
+      listen: false,
     );
 
-    // 2. Pasamos el lectorProvider como tercer argumento
     await loginProvider.logear(
-      _userController.text, 
-      _passController.text, 
+      _userController.text,
+      _passController.text,
       lectorProvider,
+      actualizarArticuloProvider,
     );
   }
 
@@ -121,8 +115,8 @@ class _LoginPageState extends State<LoginPage> {
           child: Text(
             'ScanPal - Login',
             style: TextStyle(
-              color: const Color.fromARGB(255, 0, 47, 108),       
-               fontWeight: FontWeight.bold,
+              color: const Color.fromARGB(255, 0, 47, 108),
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -152,8 +146,8 @@ class _LoginPageState extends State<LoginPage> {
 
                   Form(
                     key: _formKey,
-                    child: Consumer2<LoginProvider, ConfiguracionProvider>(
-                      builder: (context, loginProvider, configProvider, child) {
+                    child: Consumer<LoginProvider>(
+                      builder: (context, loginProvider, child) {
                         // Solo navega si el estado acaba de cambiar a success en ESTA sesión
                         if (loginProvider.state == LoginState.success) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,7 +234,12 @@ class _LoginPageState extends State<LoginPage> {
                               height: 55,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 0, 47, 108),
+                                  backgroundColor: const Color.fromARGB(
+                                    255,
+                                    0,
+                                    47,
+                                    108,
+                                  ),
                                   foregroundColor: Colors.white,
                                   elevation: 2,
                                   shape: RoundedRectangleBorder(

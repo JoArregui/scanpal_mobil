@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../domain/entities/articulo.dart';
+import '../utils/lectura_feedback.dart';
 
 class DialogoRegistroArticulo extends StatefulWidget {
   final String codigo;
@@ -8,6 +9,7 @@ class DialogoRegistroArticulo extends StatefulWidget {
   final int cantidadConfigurada;
   final String descripcionLimpia;
   final dynamic provider;
+  final bool gestionLotesHabilitada;
 
   final String? loteExtraido;
   final DateTime? fechaExtraida;
@@ -22,6 +24,7 @@ class DialogoRegistroArticulo extends StatefulWidget {
     required this.cantidadConfigurada,
     required this.provider,
     required this.descripcionLimpia,
+    this.gestionLotesHabilitada = false,
     this.loteExtraido,
     this.fechaExtraida,
     this.pesoNetoExtraido,
@@ -30,14 +33,15 @@ class DialogoRegistroArticulo extends StatefulWidget {
   });
 
   @override
-  State<DialogoRegistroArticulo> createState() => _DialogoRegistroArticuloState();
+  State<DialogoRegistroArticulo> createState() =>
+      _DialogoRegistroArticuloState();
 }
 
 class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
   late TextEditingController _cantidadController;
   late TextEditingController _loteController;
-  // Añadimos el FocusNode para controlar la selección del texto
   final FocusNode _cantidadFocusNode = FocusNode();
+  final FocusNode _loteFocusNode = FocusNode();
   bool _esCantidadBaja = false;
   bool _guardando = false;
 
@@ -45,7 +49,9 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
   void initState() {
     super.initState();
 
-    final String textoInicial = widget.cantidadConfigurada == 0 ? '' : widget.cantidadConfigurada.toString();
+    final String textoInicial = widget.cantidadConfigurada == 0
+        ? ''
+        : widget.cantidadConfigurada.toString();
     _cantidadController = TextEditingController(text: textoInicial);
 
     if (textoInicial.isNotEmpty) {
@@ -55,7 +61,8 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
       );
     }
 
-    final String loteInicial = widget.loteExtraido ?? widget.articulo.lote ?? '';
+    final String loteInicial =
+        widget.loteExtraido ?? widget.articulo.lote ?? '';
     _loteController = TextEditingController(text: loteInicial);
 
     _cantidadController.addListener(_comprobarCantidadMinima);
@@ -89,15 +96,17 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
     _cantidadController.removeListener(_comprobarCantidadMinima);
     _cantidadController.dispose();
     _loteController.dispose();
-    _cantidadFocusNode.dispose(); // Liberamos el FocusNode
+    _cantidadFocusNode.dispose();
+    _loteFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final int cantidadMinimaGlobal = widget.provider.cantidadMinimaGlobal.toInt();
+    final int cantidadMinimaGlobal = widget.provider.cantidadMinimaGlobal
+        .toInt();
     final bool esDescatalogado = widget.articulo.descatalogado;
-    final bool requiereLote = widget.articulo.gestionLotes;
+    final bool loteGestionado = widget.gestionLotesHabilitada;
 
     const Color colorAvisoCantidad = Colors.deepPurple;
 
@@ -106,7 +115,9 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
       title: Row(
         children: [
           Icon(
-            esDescatalogado ? Icons.warning_amber_rounded : Icons.inventory_2_outlined,
+            esDescatalogado
+                ? Icons.warning_amber_rounded
+                : Icons.inventory_2_outlined,
             color: esDescatalogado ? Colors.orange : Colors.blue,
             size: 28,
           ),
@@ -133,8 +144,14 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 4),
-            Text('Código: ${widget.codigo}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text('Descripción: ${widget.descripcionLimpia}', style: const TextStyle(fontSize: 13)),
+            Text(
+              'Código: ${widget.codigo}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Text(
+              'Descripción: ${widget.descripcionLimpia}',
+              style: const TextStyle(fontSize: 13),
+            ),
             if (widget.fechaExtraida != null) ...[
               const SizedBox(height: 8),
               Container(
@@ -145,11 +162,18 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.blue,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Caducidad: ${DateFormat('dd/MM/yyyy').format(widget.fechaExtraida!)}',
-                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -161,7 +185,7 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
             TextField(
               controller: _cantidadController,
               focusNode: _cantidadFocusNode,
-              autofocus: !requiereLote && widget.loteExtraido == null, 
+              autofocus: !loteGestionado,
               keyboardType: TextInputType.number,
               onTap: () => _cantidadController.selection = TextSelection(
                 baseOffset: 0,
@@ -173,8 +197,12 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                     ? 'Aviso: Stock menor al esperado ($cantidadMinimaGlobal)'
                     : 'Cantidad mínima global: $cantidadMinimaGlobal',
                 helperStyle: TextStyle(
-                  color: _esCantidadBaja ? colorAvisoCantidad : Colors.grey[600],
-                  fontWeight: _esCantidadBaja ? FontWeight.bold : FontWeight.normal,
+                  color: _esCantidadBaja
+                      ? colorAvisoCantidad
+                      : Colors.grey[600],
+                  fontWeight: _esCantidadBaja
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                 ),
                 border: const OutlineInputBorder(),
                 enabledBorder: OutlineInputBorder(
@@ -190,40 +218,56 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                   ),
                 ),
                 prefixIcon: Icon(
-                  _esCantidadBaja ? Icons.info_outline : Icons.shopping_basket_outlined,
+                  _esCantidadBaja
+                      ? Icons.info_outline
+                      : Icons.shopping_basket_outlined,
                   color: _esCantidadBaja ? colorAvisoCantidad : Colors.blue,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _loteController,
-              autofocus: requiereLote && widget.loteExtraido == null,
-              enabled: !_guardando,
-              keyboardType: TextInputType.text,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: requiereLote ? 'LOTE OBLIGATORIO' : 'Lote (Opcional)',
-                labelStyle: TextStyle(
-                    color: requiereLote ? Colors.blue : Colors.grey,
-                    fontWeight: requiereLote ? FontWeight.bold : FontWeight.normal),
-                hintText: 'Ingrese el lote',
-                border: const OutlineInputBorder(),
-                prefixIcon: Icon(Icons.tag, color: widget.loteExtraido != null ? Colors.green : Colors.blue),
-                suffixIcon: widget.loteExtraido != null
-                    ? Tooltip(
-                        message: 'Extraído de GS1',
-                        child: const Icon(Icons.auto_awesome, color: Colors.green),
-                      )
-                    : null,
+            if (loteGestionado) ...[
+              const SizedBox(height: 20),
+              TextField(
+                controller: _loteController,
+                focusNode: _loteFocusNode,
+                autofocus: widget.loteExtraido == null,
+                enabled: !_guardando,
+                keyboardType: TextInputType.text,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: 'Lote',
+                  hintText: 'Ingrese el lote',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: Icon(
+                    Icons.tag,
+                    color: widget.loteExtraido != null
+                        ? Colors.green
+                        : Colors.blue,
+                  ),
+                  suffixIcon: widget.loteExtraido != null
+                      ? Tooltip(
+                          message: 'Extraído de GS1',
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.green,
+                          ),
+                        )
+                      : null,
+                ),
               ),
-            ),
-            if (widget.loteExtraido == null && widget.articulo.lote != null && widget.articulo.lote!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                'Lote en ficha: ${widget.articulo.lote}',
-                style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic, fontSize: 12),
-              ),
+              if (widget.loteExtraido == null &&
+                  widget.articulo.lote != null &&
+                  widget.articulo.lote!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Lote en ficha: ${widget.articulo.lote}',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ],
           ],
         ),
@@ -237,7 +281,9 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
           style: ElevatedButton.styleFrom(
             backgroundColor: esDescatalogado ? Colors.orange : Colors.blue,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           onPressed: _guardando
               ? null
@@ -247,13 +293,38 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                   final loteIntroducido = _loteController.text.trim();
 
                   if (cantidad <= 0) {
+                    await LecturaFeedback.error();
                     _mostrarError('Por favor, introduzca una cantidad válida.');
                     return;
                   }
 
-                  if (requiereLote && loteIntroducido.isEmpty) {
-                    _mostrarError('El LOTE es obligatorio para este artículo.');
-                    return;
+                  if (loteGestionado && loteIntroducido.isEmpty) {
+                    await LecturaFeedback.error();
+                    if (!context.mounted) return;
+                    final continuarSinLote = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Falta el lote'),
+                        content: const Text(
+                          'No se ha introducido el lote. ¿Quieres continuar sin lote?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Introducir lote'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Continuar sin lote'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (!context.mounted) return;
+                    if (continuarSinLote != true) {
+                      _loteFocusNode.requestFocus();
+                      return;
+                    }
                   }
 
                   final navigator = Navigator.of(context);
@@ -278,11 +349,21 @@ class _DialogoRegistroArticuloState extends State<DialogoRegistroArticulo> {
                     if (exito) {
                       navigator.pop(true);
                     } else {
+                      await LecturaFeedback.error();
+                      if (!context.mounted) return;
                       setState(() => _guardando = false);
-                      _mostrarError('Error al registrar la lectura');
+                      final detalle = widget.provider.errorMessage
+                          ?.toString()
+                          .trim();
+                      _mostrarError(
+                        detalle == null || detalle.isEmpty
+                            ? 'Error al registrar la lectura. Consulte los registros de la aplicación para más detalles.'
+                            : detalle,
+                      );
                     }
                   } catch (e) {
                     if (!mounted) return;
+                    await LecturaFeedback.error();
                     setState(() => _guardando = false);
                     _mostrarError('Error: ${e.toString()}');
                   }

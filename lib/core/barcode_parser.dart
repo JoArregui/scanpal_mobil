@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 
@@ -1425,3 +1426,4 @@ class BarcodeParser {
     return texto;
   }
 }
+

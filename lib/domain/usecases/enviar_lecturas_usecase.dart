@@ -1,3 +1,4 @@
+import '../../core/constants.dart';
 import '../entities/tipo_operacion.dart';
 import '../repositories/lectura_repository.dart';
 
@@ -14,10 +15,7 @@ class EnviarLecturasUseCase {
       return 0;
     }
 
-    // 2. Capturamos el momento exacto del envío para el historial de seguridad
-    final ahora = DateTime.now();
-
-    final lecturasParaEnviar = lecturasSinFecha.map((l) {
+    final lecturasPreparadas = lecturasSinFecha.map((l) {
       String descLimpia = (l.descripcion ?? '')
           .replaceAll(RegExp(r'\u00a0'), ' ')
           .trim();
@@ -37,23 +35,32 @@ class EnviarLecturasUseCase {
       if (descLimpia.isEmpty) descLimpia = refLimpia;
 
       return l.copyWith(
-        fechaEnvio: ahora,
         descripcion: descLimpia,
         referenciaArticulo: refLimpia,
         codigoArticulo: codLimpia,
       );
     }).toList();
 
-    try {
-      // 3. Enviamos al servidor remoto
-      await repository.enviarLecturas(lecturasParaEnviar);
+    var totalEnviadas = 0;
+    for (
+      var inicio = 0;
+      inicio < lecturasPreparadas.length;
+      inicio += AppConstants.batchSize
+    ) {
+      final fin = (inicio + AppConstants.batchSize < lecturasPreparadas.length)
+          ? inicio + AppConstants.batchSize
+          : lecturasPreparadas.length;
+      final fechaEnvio = DateTime.now();
+      final loteParaEnviar = lecturasPreparadas
+          .sublist(inicio, fin)
+          .map((lectura) => lectura.copyWith(fechaEnvio: fechaEnvio))
+          .toList();
 
-      // 4. Marcamos como sincronizadas en la DB local (Esto les pone el check de 90 días)
-      await repository.marcarLecturasComoSincronizadas(lecturasParaEnviar);
-
-      return lecturasParaEnviar.length;
-    } catch (e) {
-      rethrow;
+      await repository.enviarLecturas(loteParaEnviar);
+      await repository.marcarLecturasComoSincronizadas(loteParaEnviar);
+      totalEnviadas += loteParaEnviar.length;
     }
+
+    return totalEnviadas;
   }
 }

@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import '../../domain/entities/lectura.dart';
 import '../../domain/entities/tipo_operacion.dart';
 import '../../domain/repositories/lectura_repository.dart';

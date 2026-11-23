@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import '../../domain/entities/articulo.dart';
 
 class ArticuloModel extends Articulo {
@@ -12,21 +13,37 @@ class ArticuloModel extends Articulo {
   });
 
   factory ArticuloModel.fromJson(Map<String, dynamic> json) {
-    // 1. Obtención segura del código principal
-    final String fullCodigo = (json['CodigoBarras'] ?? json['Codigo'] ?? '')
-        .toString();
+    final normalizedJson = {
+      for (final entry in json.entries)
+        entry.key.toLowerCase(): entry.value,
+    };
 
-    // 2. Lógica de separación de referencia/lote por '/'
+    dynamic valueFor(List<String> keys) {
+      for (final key in keys) {
+        final value = normalizedJson[key.toLowerCase()];
+        if (value != null) return value;
+      }
+      return null;
+    }
+
+    final fullCodigo =
+        valueFor(['CodigoBarras', 'Codigo', 'CodigoArticulo'])
+            ?.toString()
+            .trim() ??
+        '';
+    if (fullCodigo.isEmpty) {
+      throw const FormatException('El artículo no contiene un código.');
+    }
+
     String refPart = fullCodigo;
     String? lotePart;
 
     if (fullCodigo.contains('/')) {
-      List<String> parts = fullCodigo.split('/');
+      final parts = fullCodigo.split('/');
       refPart = parts[0];
       lotePart = parts.sublist(1).join('/');
     }
 
-    // 3. Parseo robusto de booleanos (maneja bool, int 0/1 y String "true"/"false")
     bool parseBool(dynamic value) {
       if (value == null) return false;
       if (value is bool) return value;
@@ -38,7 +55,6 @@ class ArticuloModel extends Articulo {
       return false;
     }
 
-    // 4. Parseo robusto de enteros para cantidad mínima
     int parseCantMin(dynamic value) {
       if (value == null) return 1;
       if (value is int) return value;
@@ -47,18 +63,21 @@ class ArticuloModel extends Articulo {
       return 1;
     }
 
+    final referencia = valueFor(['Referencia', 'Ref'])?.toString() ?? refPart;
+    final lote = valueFor(['Lote'])?.toString() ?? lotePart;
+
     return ArticuloModel(
       codigo: fullCodigo,
-      // Usamos .toString() y un fallback para evitar errores de tipo si viene nulo
-      descripcion: (json['Descripcion'] ?? json['Nombre'] ?? 'SIN DESCRIPCIÓN')
-          .toString(),
-      referencia: refPart,
-      lote: lotePart,
+      descripcion:
+          valueFor(['Descripcion', 'Nombre'])?.toString() ??
+          'SIN DESCRIPCIÓN',
+      referencia: referencia,
+      lote: lote,
       cantidadMinima: parseCantMin(
-        json['StockMinimo'] ?? json['CantidadMinima'],
+        valueFor(['StockMinimo', 'CantidadMinima']),
       ),
-      descatalogado: parseBool(json['Descatalogado']),
-      gestionLotes: parseBool(json['GestionLotes']),
+      descatalogado: parseBool(valueFor(['Descatalogado'])),
+      gestionLotes: parseBool(valueFor(['GestionLotes'])),
     );
   }
 

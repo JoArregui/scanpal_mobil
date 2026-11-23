@@ -451,6 +451,35 @@ class ActualizarArticuloProvider with ChangeNotifier {
 
   // ==================== SINCRONIZACIÓN MAESTRA ====================
 
+  Future<void> actualizarCatalogoPorCambioDeVersion() async {
+    if (_sincronizacionEnCurso) {
+      throw StateError('Ya hay una sincronización del catálogo en curso.');
+    }
+
+    await localDataSource.clearArticulos();
+    _cacheArticulos.clear();
+    _articulos.clear();
+    _articuloEncontrado = null;
+    _page = 0;
+    _hasMore = true;
+    _totalArticulos = 0;
+    _totalActivos = 0;
+    _totalDescatalogados = 0;
+    _conteoFisicoReal = 0;
+    _yaInicializado = false;
+    _state = ActualizarArticuloState.initial;
+    _notifyListenersOptimized();
+
+    await sincronizarYRecargar();
+    if (_state != ActualizarArticuloState.success) {
+      throw StateError(
+        _errorMessage.isNotEmpty
+            ? _errorMessage
+            : 'No se pudo actualizar el catálogo de artículos.',
+      );
+    }
+  }
+
   Future<void> sincronizarYRecargar() async {
     if (_sincronizacionEnCurso) return;
 
@@ -473,6 +502,13 @@ class ActualizarArticuloProvider with ChangeNotifier {
 
       _yaInicializado = false;
       await inicializarDatos();
+      if (_state == ActualizarArticuloState.error) {
+        throw StateError(
+          _errorMessage.isNotEmpty
+              ? _errorMessage
+              : 'No se pudo cargar el catálogo actualizado.',
+        );
+      }
 
       _ultimaSincronizacion = DateTime.now();
       _state = ActualizarArticuloState.success;
